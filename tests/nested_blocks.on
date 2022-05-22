@@ -1,0 +1,6 @@
+do
+    let a = 1 + 2
+    do
+        let b = a * 3
+    end
+end

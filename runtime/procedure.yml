@@ -1,0 +1,12 @@
+procedure:
+  name: "src"
+  build:
+    compiler: "clang"
+    files:
+      - "gpa.c"
+  link:
+    files:
+      - "gpa.o"
+    into: "runtime.so"
+    target: "library"
+    linker: "clang"

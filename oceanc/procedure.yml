@@ -1,0 +1,6 @@
+procedure:
+  name: "ocean"
+  build:
+    compiler: "rust"
+    files: 
+      - "oceanc.rs"
