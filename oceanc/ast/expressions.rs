@@ -94,7 +94,7 @@ impl Expression for BinaryExpression {
 
     fn generate(&self, generator: &mut Generator) {
         self.lhs.generate(generator); 
-        self.lhs.generate(generator);
+        self.rhs.generate(generator);
         let op = Op::none(OpKind::Add); 
         generator.append(op);
     }
