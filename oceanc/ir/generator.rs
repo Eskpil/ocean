@@ -21,11 +21,14 @@ impl Generator {
         self.ops.push(op);
     }
 
-    pub fn label_auto(&mut self) {
+    pub fn allocate_label(&mut self) -> String {
         let name = format!("block_{}", self.label_count);
         self.label_count += 1;
+        name
+    }
 
-        let op = Op::single(OpKind::Label, Operand::Symbol(name));
+    pub fn label_auto(&mut self) {
+        let op = Op::single(OpKind::Label, Operand::Symbol(self.allocate_label()));
 
         self.ops.push(op);
     }

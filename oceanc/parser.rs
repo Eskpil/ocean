@@ -1,5 +1,6 @@
 use crate::ast::expressions::{
     BinaryExpression, DoubleLiteral, EmptyExpression, Expression, Identifier,
+    CallExpression,
 };
 use crate::ast::statements::{
     BlockStatement, DeclarationStatement, ExpressionStatement, FunctionStatement, Program,
@@ -64,8 +65,17 @@ impl Parser {
         }
 
         if self.current.kind == TokenKind::Identifier {
-            let lhs = Box::new(Identifier::new(self.current.value.clone()));
+            let lhs = Identifier::new(self.current.value.clone());
             self.next_token();
+
+            if self.current.kind == TokenKind::LeftParen {
+                self.next_token();
+                if self.current.kind == TokenKind::RightParen {
+                    let expr = CallExpression::new(lhs);
+                    return Box::new(expr);
+                }
+            }
+
             self.next_token();
 
             if self.current.kind == TokenKind::Literal {
@@ -73,13 +83,13 @@ impl Parser {
                     self.current.value.parse::<f64>().unwrap(),
                 ));
 
-                let expr = BinaryExpression::new(lhs, rhs);
+                let expr = BinaryExpression::new(Box::new(lhs), rhs);
 
                 return Box::new(expr);
             } else {
                 let rhs = Box::new(Identifier::new(self.current.value.clone()));
 
-                let expr = BinaryExpression::new(lhs, rhs);
+                let expr = BinaryExpression::new(Box::new(lhs), rhs);
 
                 return Box::new(expr);
             }
@@ -152,6 +162,17 @@ impl Parser {
                 self.next_token();
 
                 return Box::new(function);
+            }
+
+            if self.current.kind == TokenKind::LeftParen {
+                self.next_token(); // Consume LeftParen
+                if self.current.kind == TokenKind::RightParen {
+                    self.next_token(); // Consume RightParen
+                    let expr = CallExpression::new(Identifier::new(name));  
+                    let stmt = ExpressionStatement::new(Box::new(expr));
+
+                    return Box::new(stmt);
+                }
             }
         }
 

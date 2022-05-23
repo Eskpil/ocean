@@ -2,6 +2,7 @@
 pub enum OpKind {
     // Label is a special operation handeled differently that all the others.
     Label,
+    Call,
 
     ResolveVariable,
     NewVariable,

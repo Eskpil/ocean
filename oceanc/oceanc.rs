@@ -30,5 +30,9 @@ fn main() {
 
     let ops = generator.eject();
 
-    println!("Ops: {:?}", ops);
+    println!("Ops:");
+
+    for op in ops.iter() {
+        println!("  {:?}", op); 
+    }
 }

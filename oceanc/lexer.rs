@@ -16,6 +16,9 @@ pub enum TokenKind {
     Sub,
     Div,
     Mul,
+
+    LeftParen,
+    RightParen,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +58,9 @@ impl TokenKind {
             TokenKind::Sub => "-".into(),
             TokenKind::Div => "/".into(),
             TokenKind::Mul => "*".into(),
+
+            TokenKind::RightParen => ")".into(),
+            TokenKind::LeftParen => "(".into(),
         }
     }
 }
@@ -124,6 +130,16 @@ impl Lexer {
                 self.col = 0;
                 self.advance();
                 self.next()
+            }
+            ')' => {
+                let token = Token::kind_loc(TokenKind::RightParen, self.row, self.col);
+                self.advance();
+                token
+            }
+            '(' => {
+                let token = Token::kind_loc(TokenKind::LeftParen, self.row, self.col);
+                self.advance();
+                token
             }
             '=' => {
                 let token = Token::kind_loc(TokenKind::Assignment, self.row, self.col);

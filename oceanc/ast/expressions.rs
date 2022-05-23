@@ -99,3 +99,27 @@ impl Expression for BinaryExpression {
         generator.append(op);
     }
 }
+
+pub struct CallExpression { 
+    name: Identifier
+}
+
+impl CallExpression {
+    pub fn new(name: Identifier) -> Self {
+        Self {
+            name
+        }
+    }
+}
+
+impl Expression for CallExpression {
+    fn print(&self, indent: usize) {
+        util::print_indent(indent, "CallExpression:".into());
+        self.name.print(indent + 1);
+    }
+
+    fn generate(&self, generator: &mut Generator) {
+        let op = Op::single(OpKind::Call, Operand::Symbol(self.name.inner()));
+        generator.append(op);
+    }
+}
