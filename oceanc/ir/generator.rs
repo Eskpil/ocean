@@ -7,7 +7,7 @@ pub struct Generator {
 
 impl Generator {
     pub fn new() -> Self {
-        let mut ops = Vec::new();
+        let ops = Vec::new();
 
         Self {
             ops,

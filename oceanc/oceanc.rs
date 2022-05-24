@@ -2,9 +2,11 @@ mod ast;
 mod ir;
 mod lexer;
 mod parser;
+mod backend;
 
 use ast::statements::Statement;
 use ir::generator::Generator;
+use backend::nasm::{NasmBackend};
 use std::env;
 
 use parser::Parser;
@@ -35,4 +37,8 @@ fn main() {
     for op in ops.iter() {
         println!("  {:?}", op); 
     }
+
+    let mut backend = NasmBackend::new("test.asm".to_string());
+    backend.generate_ops(ops);
+    backend.finish();
 }

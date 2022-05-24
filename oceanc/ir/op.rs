@@ -26,9 +26,33 @@ pub struct Op {
     operands: Vec<Operand>,
 }
 
+impl Operand {
+    pub fn as_symbol(&self) -> String {
+        match self {
+            Operand::Symbol(s) => s.clone(),
+            _ => unreachable!("As symbol not symbol")
+        } 
+    }
+    
+    pub fn as_float(&self) -> f64 {
+        match self {
+            Operand::Float(v) => v.clone(),
+            o => unreachable!("Expected TokenKind::Float found TokenKind: {:?}", o)
+        }
+    }
+}
+
 impl Op {
     pub fn new(kind: OpKind, operands: Vec<Operand>) -> Self {
         Self { kind, operands }
+    }
+
+    pub fn kind(&self) -> OpKind {
+        self.kind.clone()
+    }
+
+    pub fn operands(&self) -> Vec<Operand> {
+        self.operands.clone()
     }
 
     pub fn none(kind: OpKind) -> Self {

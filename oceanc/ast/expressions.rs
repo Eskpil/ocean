@@ -42,7 +42,7 @@ impl Expression for EmptyExpression {
         util::print_indent(indent, "EmptyExpression".into());
     }
 
-    fn generate(&self, generator: &mut Generator) {
+    fn generate(&self, _: &mut Generator) {
         
     }
 }
