@@ -3,3 +3,7 @@ Person do
     let b = 2 + 3
     let c = a + b
 end
+
+Program do
+  let person = Person()
+end

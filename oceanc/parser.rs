@@ -45,6 +45,11 @@ impl Parser {
                 self.current.value.parse::<f64>().unwrap(),
             ));
             self.next_token();
+
+            if self.current.kind != TokenKind::Add {
+                return lhs;
+            } 
+
             self.next_token();
 
             if self.current.kind == TokenKind::Literal {
@@ -67,6 +72,10 @@ impl Parser {
         if self.current.kind == TokenKind::Identifier {
             let lhs = Identifier::new(self.current.value.clone());
             self.next_token();
+
+            if self.current.kind != TokenKind::Add || self.current.kind != TokenKind::LeftParen {
+                return Box::new(lhs); 
+            } 
 
             if self.current.kind == TokenKind::LeftParen {
                 self.next_token();
@@ -164,6 +173,19 @@ impl Parser {
                 return Box::new(function);
             }
 
+            if self.current.kind == TokenKind::Add {
+                let lhs = DoubleLiteral::new(name.parse::<f64>().unwrap());
+                self.next_token();
+
+                if self.current.kind == TokenKind::Literal {
+                    let rhs = DoubleLiteral::new(self.current.value.parse::<f64>().unwrap());
+                    let expr = BinaryExpression::new(Box::new(lhs), Box::new(rhs));
+                    let stmt = ExpressionStatement::new(Box::new(expr));
+
+                    return Box::new(stmt);
+                }
+            }
+
             if self.current.kind == TokenKind::LeftParen {
                 self.next_token(); // Consume LeftParen
                 if self.current.kind == TokenKind::RightParen {
@@ -187,7 +209,7 @@ impl Parser {
 
         self.next_token();
 
-        while (self.tokens.len() - 1) >= self.idx {
+        while self.tokens.len() - 1 >= self.idx {
             program.append(self.parse_statement(true));
         }
 

@@ -1,7 +1,7 @@
 #[derive(Clone, Debug)]
 pub enum OpKind {
-    // Label is a special operation handeled differently that all the others.
     Label,
+    LabelEnd,
     Call,
 
     ResolveVariable,

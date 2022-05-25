@@ -16,8 +16,9 @@ impl NasmBackend {
     
         write!(file, "BITS 64\n");
         write!(file, "segment .text\n");
-        write!(file, "    global _start\n");
-        write!(file, "    _start:\n");
+        write!(file, "    global main\n");
+        write!(file, "    main:\n");
+        write!(file, "    call program\n");
 
         Self {
             scopes: vec![],
@@ -30,7 +31,7 @@ impl NasmBackend {
         self.scopes.push(self.current.clone());
         let scope = BackendScope::new(name);
         self.current = scope;
-}
+    }
 
     pub fn generate_ops(&mut self, ops: Vec<Op>) {
         for op in ops.iter() {
@@ -40,6 +41,9 @@ impl NasmBackend {
                     self.new_scope(symbol.clone());
                     write!(self.output, "    {}:\n", symbol);
                 } 
+                OpKind::LabelEnd => {
+                    write!(self.output, "    ret\n");
+                }
                 OpKind::Push => {
                     let value = op.operands()[0].as_float();
                     write!(self.output, "    sub rsp, 8\n");
@@ -54,15 +58,34 @@ impl NasmBackend {
                     write!(self.output, "    sub rsp, 8\n");
                     write!(self.output, "    movsd qword [rsp], xmm0\n");
                 }
+                OpKind::NewVariable => {
+                    let symbol = op.operands()[0].as_symbol();
+                    let var_name = self.current.append(symbol);
+                    write!(self.output, "    mov qword [{}], rsp\n", var_name);
+                    write!(self.output, "    add rsp, 8\n");
+                }
+                OpKind::ResolveVariable => {
+                    let symbol = op.operands()[0].as_symbol();
+                    let var_name = self.current.find(symbol.clone());
+                    write!(self.output, "    sub rsp, 8\n");
+                    write!(self.output, "    lea rsp, [rel {}]\n", var_name);
+                }
+                OpKind::Call => {
+                    let symbol = op.operands()[0].as_symbol();
+                    write!(self.output, "    call {}\n", symbol);
+                }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 
             }
         }  
     }
 
     pub fn finish(&mut self) {
-        write!(self.output, "    exit:\n"); 
-        write!(self.output, "    mov rax, 60\n");
-        write!(self.output, "    mov rdi, 0\n");
-        write!(self.output, "    syscall\n");
+        write!(self.output, "segment .bss\n");
+        self.scopes.push(self.current.clone());
+        for scope in self.scopes.iter() {
+            for variable in scope.eject_variables() {
+                write!(self.output, "     {}: resb 8\n", variable.1); 
+            }
+        }
     }
 }

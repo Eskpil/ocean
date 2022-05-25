@@ -31,8 +31,6 @@ impl Statement for Program {
     }
 
     fn generate(&self, generator: &mut Generator) {
-        generator.label_auto();
-        
         for (_, child) in self.children.iter().enumerate() {
             child.generate(generator);
         }
@@ -99,11 +97,13 @@ impl Statement for FunctionStatement {
     }
 
     fn generate(&self, generator: &mut Generator) {
-        generator.label(self.name.inner());
+        generator.label(self.name.inner().to_lowercase());
         
         for (_, child) in self.children.iter().enumerate() {
             child.generate(generator);
         }
+        
+        generator.append(Op::none(OpKind::LabelEnd));
     }
 
 }

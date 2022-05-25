@@ -1,8 +1,10 @@
-hello do
+Hello do
     1 + 2 
 end
 
-hello()
-let a = hello()
+Program do
+  hello()
+  let a = hello()
+end
 
 
