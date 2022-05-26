@@ -8,6 +8,7 @@ pub enum Statement {
     Block(Vec<Statement>),
     Function(String, Vec<Statement>),
     Expression(Expression),
+    While(Expression, Vec<Statement>),
     Declaration(String, Expression),
 }
 
@@ -38,6 +39,15 @@ impl Statement {
             Statement::Expression(expr) => {
                 util::print_indent(indent, "ExpressionStatement:".into());
                 expr.print(indent + 1);
+            }
+            Statement::While(expr, children) => {
+                util::print_indent(indent, "WhileStatement:".into());
+                util::print_indent(indent + 1, "Expression:".into());
+                expr.print(indent + 2);
+                util::print_indent(indent + 1, "Body:".into());
+                for child in children.iter() {
+                    child.print(indent + 2);
+                }
             }
             Statement::Declaration(name, expr) => {
                 util::print_indent(indent, "DeclarationStatement:".into());
@@ -80,6 +90,24 @@ impl Statement {
             }
             Statement::Expression(expr) => {
                 expr.generate(generator);
+            }
+            Statement::While(expr, body) => {
+                let end_label = generator.allocate_label();
+                let expression_label = generator.allocate_label();                  
+
+                generator.append(Op::single(OpKind::Block, Operand::Symbol(expression_label.clone())));
+                expr.generate(generator);
+                generator.append(Op::single(OpKind::JumpUnless, Operand::Symbol(end_label.clone())));
+
+                let body_label = generator.allocate_label();
+                generator.append(Op::single(OpKind::Block, Operand::Symbol(body_label)));
+
+                for child in body.iter() {
+                    child.generate(generator);
+                }
+                generator.append(Op::single(OpKind::Jump, Operand::Symbol(expression_label.clone())));
+
+                generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
             }
             Statement::Declaration(name, expr) => {
                 expr.generate(generator);

@@ -11,6 +11,7 @@ use errors::syntax::SyntaxError;
 use ir::generator::Generator;
 use backend::nasm::{NasmBackend};
 use std::env;
+use std::process;
 
 use parser::Parser;
 
@@ -34,6 +35,9 @@ fn main() {
             Err(err) => {
                 if let SyntaxError::End = err {
                     break;
+                } else {
+                    eprintln!("Encountered unexepected error: {:?}", err);
+                    process::exit(1);
                 } 
             }
         }

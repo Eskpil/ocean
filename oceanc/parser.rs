@@ -164,6 +164,7 @@ impl Parser {
                 | TokenKind::Let
                 | TokenKind::End
                 | TokenKind::Semicolon
+                | TokenKind::Do 
                 | TokenKind::Eof => break,
 
                 _ => {
@@ -222,12 +223,11 @@ impl Parser {
     }
 
     pub fn parse_block_body(&mut self) -> ParseResult<Vec<Statement>> {
-        // Consume do keyword.
-        self.next_token();                     
+        self.consume_next(TokenKind::Do);
         let mut body = Vec::<Statement>::new();
 
         while !self.at(TokenKind::End) {
-            if self.multi_at(&[TokenKind::Identifier, TokenKind::Let, TokenKind::Do]) {
+            if self.multi_at(&[TokenKind::Identifier, TokenKind::Let, TokenKind::Do, TokenKind::While]) {
                 body.push(self.parse_statement()?);  
             } else {
                 let expr = self.parse_expression(0)?;
@@ -275,7 +275,7 @@ impl Parser {
     }
 
     pub fn parse_let_statement(&mut self) -> ParseResult<Statement> {
-        self.next_token();
+        self.consume(TokenKind::Let)?;
         let ident = self.next_token().unwrap().value.clone();
         let mut expr = Expression::Empty;
 
@@ -287,11 +287,30 @@ impl Parser {
         return Ok(Statement::Declaration(ident, expr));
     }
 
+    pub fn parse_while_loop(&mut self) -> ParseResult<Statement> {
+        self.consume(TokenKind::While)?;
+        
+        println!("Before expression");
+
+        let expr = self.parse_expression(0)?;
+        
+        println!("Expression: {:?}", expr);
+
+        let body = self.parse_block_body()?;
+        
+        println!("Body: {:?}", body);
+
+        let stmt = Statement::While(expr, body);
+
+        Ok(stmt)
+    }
+
     pub fn parse_statement(&mut self) -> ParseResult<Statement> {
         match self.peek() {
             TokenKind::Identifier => self.parse_ident_begin(),
             TokenKind::Let => self.parse_let_statement(),
             TokenKind::Do => self.parse_block(),
+            TokenKind::While => self.parse_while_loop(),
             TokenKind::Eof => Err(SyntaxError::End),
             token => todo!("Token: {:?} not implemented yet.", token)
         }

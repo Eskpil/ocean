@@ -99,6 +99,16 @@ impl NasmBackend {
                     let symbol = op.operands()[0].as_symbol();
                     write!(self.output, "    call {}\n", symbol);
                 }
+                OpKind::Jump => {
+                    let symbol = op.operands()[0].as_symbol();
+                    write!(self.output, "    jmp {}\n", symbol);
+                }
+                OpKind::JumpUnless => {
+                    let symbol = op.operands()[0].as_symbol();
+                    write!(self.output, "    pop rax\n");
+                    write!(self.output, "    test rax, rax\n");
+                    write!(self.output, "    jz {}\n", symbol);
+                }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 
             }
         }  

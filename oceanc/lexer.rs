@@ -32,6 +32,8 @@ pub enum TokenKind {
     And,
     Or,
 
+    While,
+
     True,
     False,
 
@@ -93,6 +95,8 @@ impl TokenKind {
             TokenKind::And => "and".into(),
             TokenKind::Or => "or".into(),
 
+            TokenKind::While => "while".into(),
+
             TokenKind::True => "true".into(),
             TokenKind::False => "false".into(),
 
@@ -151,6 +155,7 @@ impl Lexer {
         keywords.insert("or".into(), TokenKind::Or);
         keywords.insert("true".into(), TokenKind::True);
         keywords.insert("false".into(), TokenKind::False);
+        keywords.insert("while".into(), TokenKind::While);
 
         Self {
             source: source.into(),

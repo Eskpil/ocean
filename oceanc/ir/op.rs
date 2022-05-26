@@ -13,6 +13,9 @@ pub enum OpKind {
     Mul,
     Sub,
     Div,
+
+    Jump,
+    JumpUnless,
 }
 
 #[derive(Clone, Debug)]
