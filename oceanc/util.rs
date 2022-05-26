@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::io::{self, Write};
 
 pub fn run_cmd_echoed(input: String) {
     let parts = input.split(" ");
@@ -10,7 +11,7 @@ pub fn run_cmd_echoed(input: String) {
 
     println!("[Info]: Running command: \"{}\"", input);
 
-    let cmd = Command::new(args[0].clone())
+    let output = Command::new(args[0].clone())
         .args({ 
             let mut args = args.clone(); 
             args.remove(0);
@@ -18,4 +19,7 @@ pub fn run_cmd_echoed(input: String) {
         })
         .output()
         .expect(format!("Failed to execute process: {}", args[0].clone()).as_str());
+    
+    io::stdout().write_all(&output.stdout).unwrap();
+    io::stderr().write_all(&output.stderr).unwrap();
 }
