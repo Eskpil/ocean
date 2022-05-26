@@ -1,3 +1,5 @@
+use crate::ast::{BinaryOp};
+
 #[derive(Clone, Debug)]
 pub enum OpKind {
     Block,
@@ -9,10 +11,8 @@ pub enum OpKind {
     NewVariable,
 
     Push,
-    Add,
-    Mul,
-    Sub,
-    Div,
+
+    Intrinsic,
 
     Jump,
     JumpUnless,
@@ -22,6 +22,7 @@ pub enum OpKind {
 pub enum Operand {
     Uint(u64),
     Symbol(String),
+    Op(BinaryOp),
 }
 
 #[derive(Clone, Debug)]
@@ -34,14 +35,21 @@ impl Operand {
     pub fn as_symbol(&self) -> String {
         match self {
             Operand::Symbol(s) => s.clone(),
-            _ => unreachable!("As symbol not symbol")
+            o => unreachable!("Expected OpKind::Symbol but found OpKind::{:?}", o),
         } 
     }
     
     pub fn as_uint(&self) -> u64 {
         match self {
             Operand::Uint(v) => v.clone(),
-            o => unreachable!("Expected TokenKind::Float found TokenKind: {:?}", o)
+            o => unreachable!("Expected OpKind::Uint but found OpKind::{:?}", o),
+        }
+    }
+
+    pub fn as_op(&self) -> BinaryOp {
+        match self {
+            Operand::Op(op) => op.clone(),
+            o => unreachable!("Expected OpKind::Op but found OpKind::{:?}", o),
         }
     }
 }

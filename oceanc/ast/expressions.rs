@@ -90,10 +90,10 @@ impl Expression {
                 let op = Op::single(OpKind::ResolveVariable, Operand::Symbol(v.clone()));
                 generator.append(op);
             }
-            Expression::Binary(op, lhs, rhs) => {
+            Expression::Binary(binary_op, lhs, rhs) => {
                 lhs.generate(generator); 
                 rhs.generate(generator);
-                let op = Op::none(OpKind::Add); 
+                let op = Op::single(OpKind::Intrinsic, Operand::Op(binary_op));
                 generator.append(op);
             }
             Expression::Unary(op, expr) => {

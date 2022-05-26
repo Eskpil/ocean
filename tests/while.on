@@ -1,4 +1,4 @@
 Program do 
-  while false do
+  while 1 > 0 do
   end
 end

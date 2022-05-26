@@ -1,5 +1,6 @@
 use super::scope::{BackendScope};
 use crate::ir::{op::{Op, OpKind}};
+use crate::ast::BinaryOp;
 use std::io::Write;
 use std::fs::File;
 use std::collections::HashMap;
@@ -71,13 +72,86 @@ impl NasmBackend {
                     // We have pushed a value onto the stack.
                     self.current.count += 1;
                 }
-                OpKind::Add => {
-                    write!(self.output, "    pop rax\n");
-                    write!(self.output, "    pop rbx\n");
-                    write!(self.output, "    add rax, rbx\n");
-                    write!(self.output, "    push rax\n");
-                    // 2 - 1 = 1. We have taken one element of the stack.
-                    self.current.count -= 1;
+                OpKind::Intrinsic => {
+                    let binary_op = op.operands()[0].as_op();
+                    match binary_op {
+                        BinaryOp::Add => {
+                            write!(self.output, "    pop rax\n");
+                            write!(self.output, "    pop rbx\n");
+                            write!(self.output, "    add rax, rbx\n");
+                            write!(self.output, "    push rax\n");
+                            // 2 - 1 = 1. We have taken one element of the stack.
+                            self.current.count -= 1;
+                        }
+                        BinaryOp::Mul => {
+                            write!(self.output, "    pop rax\n");
+                            write!(self.output, "    pop rbx\n");
+                            write!(self.output, "    imul rax, rbx\n");
+                            write!(self.output, "    push rax\n");
+                            // 2 - 1 = 1. We have taken one element of the stack.
+                            self.current.count -= 1;                           
+                        }
+                        BinaryOp::Div => {
+                            write!(self.output, "   pop rax\n"); // What we are dividing by.
+                            write!(self.output, "   pop rbx\n"); // What we are dividing.
+                            write!(self.output, "   mov rbx, rdx\n");
+                            write!(self.output, "   cqo\n");
+                            write!(self.output, "   div rax\n");
+                            write!(self.output, "   push rbx\n");
+                            // 2 - 1 = 1. We have taken one element of the stack.
+                            self.current.count -= 1;                           
+                        }
+                        BinaryOp::Sub => {
+                            write!(self.output, "   pop rax\n"); // What we are subtracting with.
+                            write!(self.output, "   pop rbx\n"); // What we are subtracting.
+                            write!(self.output, "   sub rax, rbx\n");
+                            write!(self.output, "   push rax\n");
+                            // 2 - 1 = 1. We have taken one element of the stack.
+                            self.current.count -= 1;                           
+                        }
+                        BinaryOp::Greater => {
+                           write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
+                           write!(self.output, "    pop rbx\n"); // 1 > 0 in this case we have 1.
+                           write!(self.output, "    cmp rbx, rax\n");
+                           write!(self.output, "    setg al\n");
+                           write!(self.output, "    movzx rax, al\n");
+                           write!(self.output, "    push rax\n");
+                           // 2 - 1 = 1. We have taken one element of the stack.
+                           self.current.count -= 1;
+                        }
+                        BinaryOp::GreaterEquals => {
+                           write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
+                           write!(self.output, "    pop rbx\n"); // 1 > 0 in this case we have 1.
+                           write!(self.output, "    cmp rbx, rax\n");
+                           write!(self.output, "    setge al\n");
+                           write!(self.output, "    movzx rax, al\n");
+                           write!(self.output, "    push rax\n");  
+                           // 2 - 1 = 1. We have taken one element of the stack.
+                           self.current.count -= 1;
+                        }
+                        BinaryOp::Less => {
+                           write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
+                           write!(self.output, "    pop rbx\n"); // 1 > 0 in this case we have 1.
+                           write!(self.output, "    cmp rbx, rax\n");
+                           write!(self.output, "    setl al\n");
+                           write!(self.output, "    movzx rax, al\n");
+                           write!(self.output, "    push rax\n");
+                           // 2 - 1 = 1. We have taken one element of the stack.
+                           self.current.count -= 1;
+                        }
+                        BinaryOp::LessEquals => {
+                           write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
+                           write!(self.output, "    pop rbx\n"); // 1 > 0 in this case we have 1.
+                           write!(self.output, "    cmp rbx, rax\n");
+                           write!(self.output, "    setle al\n");
+                           write!(self.output, "    movzx rax, al\n");
+                           write!(self.output, "    push rax\n");
+                           // 2 - 1 = 1. We have taken one element of the stack.
+                           self.current.count -= 1;
+
+                        }
+                        o => todo!("Implement instrinsic: {:?}", o),
+                    }
                 }
                 OpKind::NewVariable => {
                     let symbol = op.operands()[0].as_symbol();
@@ -106,8 +180,8 @@ impl NasmBackend {
                 OpKind::JumpUnless => {
                     let symbol = op.operands()[0].as_symbol();
                     write!(self.output, "    pop rax\n");
-                    write!(self.output, "    test rax, rax\n");
-                    write!(self.output, "    jz {}\n", symbol);
+                    write!(self.output, "    cmp rax, 0\n");
+                    write!(self.output, "    je {}\n", symbol);
                 }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 
             }
