@@ -140,6 +140,10 @@ impl Parser {
             }
         };
 
+        if self.at(TokenKind::LeftParen) {
+            return self.parse_function_call(lhs);
+        }
+
         loop {
              let op = match self.peek() {
                 op @ TokenKind::Add
@@ -206,6 +210,17 @@ impl Parser {
         Ok(lhs)
     }
 
+    pub fn parse_function_call(&mut self, lhs: Expression) -> ParseResult<Expression> {
+        self.consume(TokenKind::RightParen); 
+        self.consume(TokenKind::LeftParen);
+
+        let name = lhs.as_identifier();
+
+        let expr = Expression::Call(name);
+
+        Ok(expr)
+    }
+
     pub fn parse_block_body(&mut self) -> ParseResult<Vec<Statement>> {
         // Consume do keyword.
         self.next_token();                     
@@ -247,6 +262,12 @@ impl Parser {
                 let stmt = Statement::Function(ident.value.clone(), block);
                 stmt
             } 
+            TokenKind::LeftParen => {
+                let ident_expr = Expression::Identifier(ident.value.clone());
+                let expr = self.parse_function_call(ident_expr)?;
+                let stmt = Statement::Expression(expr);
+                stmt
+            }
             token => unimplemented!("Token: {:?} is not implemented yet.", token)
         };
 

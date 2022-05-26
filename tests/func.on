@@ -1,9 +1,9 @@
 Person do 
-    let a = 1 + 2
-    let b = 2 + 3
-    let c = a + b
+    let a = 1 + 2;
+    let b = 2 + 3;
+    let c = a + b;
 end
 
 Program do
-  let person = Person()
+  Person();
 end

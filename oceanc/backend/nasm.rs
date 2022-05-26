@@ -85,7 +85,7 @@ impl NasmBackend {
                     write!(self.output, "    pop rax\n");
                     write!(self.output, "    mov [rel {}], rax\n", var_name);
                     // We have taken one value of the stack and moved it into a variable.
-                    self.current.count -= 1;
+                    if self.current.count >= 1 { self.current.count -= 1; }
                 }
                 OpKind::ResolveVariable => {
                     let symbol = op.operands()[0].as_symbol();
@@ -97,7 +97,6 @@ impl NasmBackend {
                 }
                 OpKind::Call => {
                     let symbol = op.operands()[0].as_symbol();
-                    write!(self.output, "    mov rbp, rsp\n");
                     write!(self.output, "    call {}\n", symbol);
                 }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 

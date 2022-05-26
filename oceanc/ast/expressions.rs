@@ -4,6 +4,7 @@ use crate::ir::{
     generator::Generator,
     op::{Op, OpKind, Operand},
 };
+use std::process;
 
 #[derive(Debug, Clone)]
 pub enum Expression {
@@ -17,6 +18,16 @@ pub enum Expression {
 }
 
 impl Expression {
+    pub fn as_identifier(&self) -> String {
+        match self.clone() {
+            Expression::Identifier(i) => i.clone(),
+            expr => { 
+                eprintln!("Expression: {:?} cannot be converted into an Identifier", expr); 
+                process::exit(1);
+            }
+        }
+    }
+
     pub fn print(&self, indent: usize) {
         match self.clone() {
             Expression::Empty => {
@@ -53,7 +64,8 @@ impl Expression {
             }
             Expression::Call(name) => {
                 util::print_indent(indent, "CallExpression:".into());
-                util::print_indent(indent + 1, name);
+                util::print_indent(indent + 1, "Name:".into());
+                util::print_indent(indent + 2, name);
             }
         }    
     }
@@ -88,7 +100,7 @@ impl Expression {
                 todo!("Generate unary expression");
             }
             Expression::Call(name) => {
-                let op = Op::single(OpKind::Call, Operand::Symbol(name.clone()));
+                let op = Op::single(OpKind::Call, Operand::Symbol(name.clone().to_lowercase()));
                 generator.append(op);
             }
         }
