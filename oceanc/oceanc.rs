@@ -4,6 +4,7 @@ mod lexer;
 mod parser;
 mod backend;
 mod errors;
+mod util;
 
 use ast::statements::Statement;
 use errors::syntax::SyntaxError;
@@ -56,4 +57,7 @@ fn main() {
     let mut backend = NasmBackend::new("test.asm".to_string());
     backend.generate_ops(ops);
     backend.finish();
+
+    util::run_cmd_echoed("nasm -felf64 test.asm".to_string());
+    util::run_cmd_echoed("gcc -o test ./test.o".to_string());
 }
