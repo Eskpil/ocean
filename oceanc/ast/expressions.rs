@@ -1,125 +1,97 @@
-use super::util;
+use super::{util, BinaryOp};
+use std::boxed::Box;
 use crate::ir::{
     generator::Generator,
     op::{Op, OpKind, Operand},
 };
 
-pub trait Expression {
-    fn print(&self, indent: usize);
-    fn generate(&self, generator: &mut Generator);
+#[derive(Debug, Clone)]
+pub enum Expression {
+    Empty,
+    Literal(u64),
+    Bool(bool),
+    Identifier(String),
+    Binary(BinaryOp, Box<Expression>, Box<Expression>),
+    Unary(BinaryOp, Box<Expression>),
+    Call(String),
 }
 
-pub struct DoubleLiteral(f64);
+impl Expression {
+    pub fn print(&self, indent: usize) {
+        match self.clone() {
+            Expression::Empty => {
+                util::print_indent(indent, "EmptyExpression".into());
+            }
+            Expression::Bool(v) => {
+                util::print_indent(indent, "Bool".into());
+                util::print_indent(indent + 1, format!("{}", v));
+            }
+            Expression::Literal(v) => {
+                util::print_indent(indent, "Literal:".into());
+                util::print_indent(indent + 1, format!("{}", v));
+            }
+            Expression::Identifier(v) => {
+                util::print_indent(indent, "Identifier:".into());
+                util::print_indent(indent + 1, v.clone());
+            }
+            Expression::Binary(op, lhs, rhs) => {
+                util::print_indent(indent, "BinaryExpression:".into());
+                util::print_indent(indent + 1, "op:".into());
+                util::print_indent(indent + 2, op.to_string());
+                util::print_indent(indent + 1, "lhs:".into());
+                lhs.print(indent + 2);
 
-impl DoubleLiteral {
-    pub fn new(value: f64) -> Self {
-        Self(value)
-    }
-}
-
-impl Expression for DoubleLiteral {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "DoubleLiteral:".into());
-        util::print_indent(indent + 1, format!("{}", self.0));
-    }
-
-    fn generate(&self, generator: &mut Generator) {
-        let op = Op::single(OpKind::Push, Operand::Float(self.0));
-        generator.append(op);
-    }
-}
-
-pub struct EmptyExpression();
-
-impl EmptyExpression {
-    pub fn new() -> Self {
-        Self()
-    }
-}
-
-impl Expression for EmptyExpression {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "EmptyExpression".into());
-    }
-
-    fn generate(&self, _: &mut Generator) {
-        
-    }
-}
-
-pub struct Identifier(String);
-
-impl Identifier {
-    pub fn new(name: String) -> Self {
-        Self(name)
+                util::print_indent(indent + 1, "rhs:".into());
+                rhs.print(indent + 2);
+            }
+            Expression::Unary(op, expr) => {
+                util::print_indent(indent, "UnaryExpression:".into());
+                util::print_indent(indent + 1, "op:".into());
+                util::print_indent(indent + 2, op.to_string());
+                util::print_indent(indent + 1, "expr".into());
+                expr.print(indent + 2);
+            }
+            Expression::Call(name) => {
+                util::print_indent(indent, "CallExpression:".into());
+                util::print_indent(indent + 1, name);
+            }
+        }    
     }
 
-    pub fn inner(&self) -> String {
-        return self.0.clone();
-    }
-}
-
-impl Expression for Identifier {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "Identifier:".into());
-        util::print_indent(indent + 1, self.0.clone());
-    }
-
-    fn generate(&self, generator: &mut Generator) {
-        let op = Op::single(OpKind::ResolveVariable, Operand::Symbol(self.0.clone()));
-        generator.append(op);
-    }
-}
-
-pub struct BinaryExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
-
-impl BinaryExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
-    }
-}
-
-impl Expression for BinaryExpression {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "BinaryExpression:".into());
-        util::print_indent(indent + 1, "lhs:".into());
-        self.lhs.print(indent + 2);
-
-        util::print_indent(indent + 1, "rhs:".into());
-        self.rhs.print(indent + 2);
-    }
-
-    fn generate(&self, generator: &mut Generator) {
-        self.lhs.generate(generator); 
-        self.rhs.generate(generator);
-        let op = Op::none(OpKind::Add); 
-        generator.append(op);
-    }
-}
-
-pub struct CallExpression { 
-    name: Identifier
-}
-
-impl CallExpression {
-    pub fn new(name: Identifier) -> Self {
-        Self {
-            name
+    pub fn generate(&self, generator: &mut Generator) {
+        match self.clone() {
+            Expression::Empty => {
+                                   
+            }
+            Expression::Bool(v) => {
+                let mut op = Op::single(OpKind::Push, Operand::Uint(0));
+                if v {
+                    op = Op::single(OpKind::Push, Operand::Uint(1));
+                }
+                generator.append(op);
+            }
+            Expression::Literal(v) => {
+               let op = Op::single(OpKind::Push, Operand::Uint(v));
+               generator.append(op);
+            }
+            Expression::Identifier(v) => {
+                let op = Op::single(OpKind::ResolveVariable, Operand::Symbol(v.clone()));
+                generator.append(op);
+            }
+            Expression::Binary(op, lhs, rhs) => {
+                lhs.generate(generator); 
+                rhs.generate(generator);
+                let op = Op::none(OpKind::Add); 
+                generator.append(op);
+            }
+            Expression::Unary(op, expr) => {
+                todo!("Generate unary expression");
+            }
+            Expression::Call(name) => {
+                let op = Op::single(OpKind::Call, Operand::Symbol(name.clone()));
+                generator.append(op);
+            }
         }
     }
 }
 
-impl Expression for CallExpression {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "CallExpression:".into());
-        self.name.print(indent + 1);
-    }
-
-    fn generate(&self, generator: &mut Generator) {
-        let op = Op::single(OpKind::Call, Operand::Symbol(self.name.inner()));
-        generator.append(op);
-    }
-}

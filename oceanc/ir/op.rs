@@ -1,7 +1,8 @@
 #[derive(Clone, Debug)]
 pub enum OpKind {
-    Label,
-    LabelEnd,
+    Block,
+    Proc,
+    End,
     Call,
 
     ResolveVariable,
@@ -16,7 +17,7 @@ pub enum OpKind {
 
 #[derive(Clone, Debug)]
 pub enum Operand {
-    Float(f64),
+    Uint(u64),
     Symbol(String),
 }
 
@@ -34,9 +35,9 @@ impl Operand {
         } 
     }
     
-    pub fn as_float(&self) -> f64 {
+    pub fn as_uint(&self) -> u64 {
         match self {
-            Operand::Float(v) => v.clone(),
+            Operand::Uint(v) => v.clone(),
             o => unreachable!("Expected TokenKind::Float found TokenKind: {:?}", o)
         }
     }

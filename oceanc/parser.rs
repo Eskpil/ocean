@@ -1,218 +1,278 @@
-use crate::ast::expressions::{
-    BinaryExpression, DoubleLiteral, EmptyExpression, Expression, Identifier,
-    CallExpression,
-};
-use crate::ast::statements::{
-    BlockStatement, DeclarationStatement, ExpressionStatement, FunctionStatement, Program,
-    Statement,
-};
+use crate::ast::{BinaryOp, expressions::{Expression}, statements::{Statement}};
 use crate::lexer::{Lexer, Token, TokenKind};
+use crate::errors::syntax::SyntaxError;
+use std::iter::Peekable;
+
+type SyntaxResult<T> = Result<T, SyntaxError>;
+type ParseResult<T> = Result<T, SyntaxError>;
 
 pub struct Parser {
-    lexer: Lexer,
-
-    current: Token,
-    idx: usize,
-    tokens: Vec<Token>,
+    lexer: Peekable<Lexer>,
 }
 
+/* Credit to https://domenicquirl.github.io/blog/parsing-basics/#binary-operators */
+trait Operator {
+    /// Prefix operators bind their operand to the right
+    fn prefix_binding_power(&self) -> Option<((), u8)>;
+
+    /// Infix operators bind two operands, lhs and rhs
+    fn infix_binding_power(&self) -> Option<(u8, u8)>;
+
+    /// Postfix operators bind their operand to the left
+    fn postfix_binding_power(&self) -> Option<(u8, ())>;
+}
+
+impl Operator for TokenKind {
+    fn prefix_binding_power(&self) -> Option<((), u8)> {
+        Some(match self {
+            TokenKind::Sub => ((), 51),
+            TokenKind::Not => ((), 101),
+            _ => {
+                return None;
+            }
+        })
+    }
+
+    fn infix_binding_power(&self) -> Option<(u8, u8)> {
+        Some(match self {
+            TokenKind::Or => (1, 2),
+            TokenKind::And => (3, 4),
+            TokenKind::Equals | TokenKind::NotEquals => (5, 6),
+            TokenKind::Less | TokenKind::Greater | TokenKind::LessEquals | TokenKind::GreaterEquals => (7, 8),
+            TokenKind::Add | TokenKind::Sub => (9, 10),
+            TokenKind::Mul | TokenKind::Div => (11, 12),
+            _ => return None,
+        })
+    }
+
+    fn postfix_binding_power(&self) -> Option<(u8, ())> {
+        None
+    }
+}
+
+
 impl Parser {
-    pub fn new(source: String) -> Self {
-        let mut lexer = Lexer::new(source);
-        let mut tokens = vec![];
-
-        while !lexer.is_at_end() {
-            tokens.push(lexer.next());
-        }
-
+    pub fn new(input: String) -> Self {
         Self {
-            lexer,
+            lexer: Lexer::new(input).peekable(),
+        } 
+    }
 
-            current: Token::kind(TokenKind::Add),
-            tokens,
-            idx: 0,
+    pub fn next_token(&mut self) -> SyntaxResult<Token> {
+        self.lexer.next().ok_or_else(|| {
+            SyntaxError::UnexpectedEndOfInput(Token {
+                kind: TokenKind::Eof,
+                value: String::new(),
+                row: 0,
+                col: 0,
+            })
+        })
+    }
+
+    #[inline(always)]
+    pub fn peek(&mut self) -> TokenKind {
+        self.lexer
+            .peek()
+            .map(|token| token.kind)
+            .unwrap_or(TokenKind::Eof)
+    }
+
+    #[inline(always)]
+    pub fn at(&mut self, kind: TokenKind) -> bool {
+        self.peek() == kind
+    }
+
+    #[inline(always)]
+    pub fn multi_at(&mut self, kinds: &'static [TokenKind]) -> bool {
+        kinds.contains(&self.peek())
+    }
+
+    pub fn consume(&mut self, expected: TokenKind) -> SyntaxResult<()> {
+        let token = self.next_token()?;
+        if token.kind != expected {
+            Err(SyntaxError::UnexpectedToken {
+                expected: expected.to_string(),
+                found: token,
+            })
+        } else {
+            Ok(())
         }
     }
 
-    pub fn next_token(&mut self) {
-        self.idx += 1;
-        self.current = self.tokens.iter().nth(self.idx - 1).unwrap().clone();
+    pub fn consume_next(&mut self, expected: TokenKind) -> SyntaxResult<Token> {
+        let token = self.next_token()?;
+        if token.kind != expected {
+            Err(SyntaxError::UnexpectedToken {
+                expected: expected.to_string(),
+                found: token,
+            })
+        } else {
+            Ok(token)
+        }
     }
 
-    pub fn parse_expression(&mut self) -> Box<dyn Expression> {
-        if self.current.kind == TokenKind::Literal {
-            let lhs = Box::new(DoubleLiteral::new(
-                self.current.value.parse::<f64>().unwrap(),
-            ));
-            self.next_token();
+    pub fn parse_literal(&mut self, lit: TokenKind) -> ParseResult<Expression> {
+        let token = self.next_token()?;
+        
+        let literal = match lit {
+            TokenKind::Literal => Expression::Literal(token.value.parse::<u64>().unwrap()), 
+            TokenKind::True => Expression::Bool(true),
+            TokenKind::False => Expression::Bool(false),
+            TokenKind::Identifier => Expression::Identifier(token.value.clone()),
+            token => unimplemented!("Error handeling or token: {:?}", token)
+        };
 
-            if self.current.kind != TokenKind::Add {
-                return lhs;
+        Ok(literal)
+    }
+
+    pub fn parse_expression(&mut self, binding_power: u8) -> ParseResult<Expression> {
+        let mut lhs = match self.peek() {
+            lit @ TokenKind::Literal
+                | lit @ TokenKind::Identifier
+                | lit @ TokenKind::True
+                | lit @ TokenKind::False => self.parse_literal(lit)?,
+            _ => {
+               let token = self.next_token()?;
+                return Err(SyntaxError::UnexpectedToken {
+                    expected: "expression".to_string(),
+                    found: token,
+                });
+            }
+        };
+
+        loop {
+             let op = match self.peek() {
+                op @ TokenKind::Add
+                | op @ TokenKind::Sub
+                | op @ TokenKind::Mul
+                | op @ TokenKind::Div
+                | op @ TokenKind::And
+                | op @ TokenKind::Or
+                | op @ TokenKind::Less
+                | op @ TokenKind::Greater
+                | op @ TokenKind::Not
+                | op @ TokenKind::LessEquals
+                | op @ TokenKind::GreaterEquals
+                | op @ TokenKind::NotEquals
+                | op @ TokenKind::Equals => op,
+
+                TokenKind::RightParen
+                | TokenKind::Let
+                | TokenKind::End
+                | TokenKind::Semicolon
+                | TokenKind::Eof => break,
+
+                _ => {
+                    let token = self.next_token()?;
+                    return Err(SyntaxError::UnexpectedToken {
+                        expected: "operator or expression terminator".to_string(),
+                        found: token,
+                    });
+                }
+            };
+
+              if let Some((left_binding_power, ())) = op.postfix_binding_power() {
+                if left_binding_power < binding_power {
+                    // previous operator has higher binding power then new one
+                    // --> end of expression
+                    break;
+                }
+
+                let op_token = self.consume_next(op)?;
+
+                lhs = Expression::Unary(BinaryOp::from_token_kind(&op), Box::new(lhs));
+                // parsed an operator --> go round the loop again
+                continue;
+            }
+
+           if let Some((left_binding_power, right_binding_power)) = op.infix_binding_power() {
+                if left_binding_power < binding_power {
+                    // previous operator has higher binding power then new one
+                    // --> end of expression
+                    break;
+                }
+
+                self.consume(op)?;
+
+                let rhs = self.parse_expression(right_binding_power)?;
+                lhs = Expression::Binary(BinaryOp::from_token_kind(&op), Box::new(lhs), Box::new(rhs));
+
+                // parsed an operator --> go round the loop again
+                continue;
+            }
+            break;
+        }
+
+        Ok(lhs)
+    }
+
+    pub fn parse_block_body(&mut self) -> ParseResult<Vec<Statement>> {
+        // Consume do keyword.
+        self.next_token();                     
+        let mut body = Vec::<Statement>::new();
+
+        while !self.at(TokenKind::End) {
+            if self.multi_at(&[TokenKind::Identifier, TokenKind::Let, TokenKind::Do]) {
+                body.push(self.parse_statement()?);  
+            } else {
+                let expr = self.parse_expression(0)?;
+                let stmt = Statement::Expression(expr);
+                body.push(stmt);
+            }
+
+            if !self.at(TokenKind::Semicolon) {
+                break;
+            }
+            self.consume(TokenKind::Semicolon)?;
+        }
+
+        self.consume_next(TokenKind::End)?;
+
+        Ok(body)
+    }
+    
+    pub fn parse_block(&mut self) -> ParseResult<Statement> {
+        let body = self.parse_block_body()?;    
+        let stmt = Statement::Block(body);
+
+        Ok(stmt)
+    }
+
+    pub fn parse_ident_begin(&mut self) -> ParseResult<Statement> {
+        let ident = self.next_token().unwrap();  
+
+        let stmt = match self.peek() {
+            TokenKind::Do => {
+                let block = self.parse_block_body()?;         
+                let stmt = Statement::Function(ident.value.clone(), block);
+                stmt
             } 
+            token => unimplemented!("Token: {:?} is not implemented yet.", token)
+        };
 
-            self.next_token();
-
-            if self.current.kind == TokenKind::Literal {
-                let rhs = Box::new(DoubleLiteral::new(
-                    self.current.value.parse::<f64>().unwrap(),
-                ));
-
-                let expr = BinaryExpression::new(lhs, rhs);
-
-                return Box::new(expr);
-            } else {
-                let rhs = Box::new(Identifier::new(self.current.value.clone()));
-
-                let expr = BinaryExpression::new(lhs, rhs);
-
-                return Box::new(expr);
-            }
-        }
-
-        if self.current.kind == TokenKind::Identifier {
-            let lhs = Identifier::new(self.current.value.clone());
-            self.next_token();
-
-            if self.current.kind != TokenKind::Add || self.current.kind != TokenKind::LeftParen {
-                return Box::new(lhs); 
-            } 
-
-            if self.current.kind == TokenKind::LeftParen {
-                self.next_token();
-                if self.current.kind == TokenKind::RightParen {
-                    let expr = CallExpression::new(lhs);
-                    return Box::new(expr);
-                }
-            }
-
-            self.next_token();
-
-            if self.current.kind == TokenKind::Literal {
-                let rhs = Box::new(DoubleLiteral::new(
-                    self.current.value.parse::<f64>().unwrap(),
-                ));
-
-                let expr = BinaryExpression::new(Box::new(lhs), rhs);
-
-                return Box::new(expr);
-            } else {
-                let rhs = Box::new(Identifier::new(self.current.value.clone()));
-
-                let expr = BinaryExpression::new(Box::new(lhs), rhs);
-
-                return Box::new(expr);
-            }
-        }
-
-        return Box::new(BinaryExpression::new(
-            Box::new(DoubleLiteral::new(1.0)),
-            Box::new(DoubleLiteral::new(2.0)),
-        ));
+        Ok(stmt)
     }
 
-    pub fn parse_statement(&mut self, should_consume: bool) -> Box<dyn Statement> {
-        if self.current.kind == TokenKind::Literal {
-            let stmt = ExpressionStatement::new(self.parse_expression());
-
-            if should_consume {
-                self.next_token();
-            }
-
-            return Box::new(stmt);
-        }
-
-        if self.current.kind == TokenKind::Let {
-            self.next_token(); // Consume Let token.
-            let identifier = Identifier::new(self.current.value.clone());
-            self.next_token(); // Consume Identifier as we are finished with it.
-
-            if self.current.kind == TokenKind::Assignment {
-                self.next_token(); // Consume Assignment token.
-                let expr = self.parse_expression();
-
-                if should_consume {
-                    self.next_token();
-                }
-
-                let stmt = DeclarationStatement::new(identifier, expr);
-                return Box::new(stmt);
-            } else {
-                let expr = EmptyExpression::new();
-                let stmt = ExpressionStatement::new(Box::new(expr));
-                return Box::new(stmt);
-            }
-        }
-
-        if self.current.kind == TokenKind::Do {
-            let mut block = BlockStatement::new();
-
-            while self.current.kind != TokenKind::End {
-                self.next_token();
-                block.append(self.parse_statement(false));
-            }
-
-            self.next_token();
-
-            return Box::new(block);
-        }
-
-        if self.current.kind == TokenKind::Identifier {
-            let name = self.current.value.clone();
-            self.next_token();
-
-            if self.current.kind == TokenKind::Do {
-                let mut function = FunctionStatement::new(Identifier::new(name));
-
-                while self.current.kind != TokenKind::End {
-                    self.next_token();
-                    function.append(self.parse_statement(false));
-                }
-
-                self.next_token();
-
-                return Box::new(function);
-            }
-
-            if self.current.kind == TokenKind::Add {
-                let lhs = DoubleLiteral::new(name.parse::<f64>().unwrap());
-                self.next_token();
-
-                if self.current.kind == TokenKind::Literal {
-                    let rhs = DoubleLiteral::new(self.current.value.parse::<f64>().unwrap());
-                    let expr = BinaryExpression::new(Box::new(lhs), Box::new(rhs));
-                    let stmt = ExpressionStatement::new(Box::new(expr));
-
-                    return Box::new(stmt);
-                }
-            }
-
-            if self.current.kind == TokenKind::LeftParen {
-                self.next_token(); // Consume LeftParen
-                if self.current.kind == TokenKind::RightParen {
-                    self.next_token(); // Consume RightParen
-                    let expr = CallExpression::new(Identifier::new(name));  
-                    let stmt = ExpressionStatement::new(Box::new(expr));
-
-                    return Box::new(stmt);
-                }
-            }
-        }
-
-        let expr = EmptyExpression::new();
-        let stmt = ExpressionStatement::new(Box::new(expr));
-
-        Box::new(stmt)
-    }
-
-    pub fn parse(&mut self) -> Program {
-        let mut program = Program::new();
-
+    pub fn parse_let_statement(&mut self) -> ParseResult<Statement> {
         self.next_token();
+        let ident = self.next_token().unwrap().value.clone();
+        let mut expr = Expression::Empty;
 
-        while self.tokens.len() - 1 >= self.idx {
-            program.append(self.parse_statement(true));
+        if self.at(TokenKind::Assignment) {
+            self.consume(TokenKind::Assignment)?;
+            expr = self.parse_expression(0)?;
         }
 
-        program
+        return Ok(Statement::Declaration(ident, expr));
+    }
+
+    pub fn parse_statement(&mut self) -> ParseResult<Statement> {
+        match self.peek() {
+            TokenKind::Identifier => self.parse_ident_begin(),
+            TokenKind::Let => self.parse_let_statement(),
+            TokenKind::Do => self.parse_block(),
+            TokenKind::Eof => Err(SyntaxError::End),
+            token => todo!("Token: {:?} not implemented yet.", token)
+        }
     }
 }

@@ -1,155 +1,91 @@
-use super::expressions::{Expression, Identifier};
+use super::expressions::{Expression};
 use super::util;
 use crate::ir::{op::{Op, OpKind, Operand}, generator::{Generator}};
-use std::boxed::Box;
 
-pub trait Statement {
-    fn print(&self, ident: usize);
-    fn generate(&self, generator: &mut Generator);
+#[derive(Debug, Clone)]
+pub enum Statement {
+    Program(Vec<Statement>),
+    Block(Vec<Statement>),
+    Function(String, Vec<Statement>),
+    Expression(Expression),
+    Declaration(String, Expression),
 }
 
-pub struct Program {
-    children: Vec<Box<dyn Statement>>,
-}
+impl Statement {
+    pub fn print(&self, indent: usize) {
+        match self.clone() {
+            Statement::Program(children) => {
+                util::print_indent(indent, "Program:".into());
+                for child in children.iter() {
+                    child.print(indent + 1);
+                }
+            }
+            Statement::Block(children) => {
+                util::print_indent(indent, "BlockStatement:".into());
+                for child in children.iter() {
+                    child.print(indent + 1);
+                }
+            }
+            Statement::Function(name, children) => {
+                util::print_indent(indent, "FunctionStatement:".into());
+                util::print_indent(indent + 1, "Name:".into());
+                util::print_indent(indent + 2, name);
+                util::print_indent(indent + 1, "Children:".into());
+                for child in children.iter() {
+                    child.print(indent + 2);
+                }
+            }
+            Statement::Expression(expr) => {
+                util::print_indent(indent, "ExpressionStatement:".into());
+                expr.print(indent + 1);
+            }
+            Statement::Declaration(name, expr) => {
+                util::print_indent(indent, "DeclarationStatement:".into());
 
-impl Program {
-    pub fn new() -> Self {
-        Self { children: vec![] }
+                util::print_indent(indent + 1, "Name:".into());
+                util::print_indent(indent + 2, name.clone());
+                expr.print(indent + 1);
+            }
+        } 
     }
 
-    pub fn append(&mut self, stmt: Box<dyn Statement>) {
-        self.children.push(stmt);
-    }
-}
+    pub fn generate(&self, generator: &mut Generator) {
+        match self.clone() {
+            Statement::Program(children) => {
+                for child in children.iter() {
+                    child.generate(generator);
+                }
+            }
+            Statement::Block(children) => {
+                let label = generator.allocate_label();
 
-impl Statement for Program {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "Program:".into());
-        for (_, child) in self.children.iter().enumerate() {
-            child.print(indent + 1);
-        }
-    }
+                let op = Op::single(OpKind::Block, Operand::Symbol(label.clone()));
 
-    fn generate(&self, generator: &mut Generator) {
-        for (_, child) in self.children.iter().enumerate() {
-            child.generate(generator);
-        }
-    }
-}
+                generator.append(op);
 
-pub struct BlockStatement {
-    children: Vec<Box<dyn Statement>>,
-}
+                for child in children.iter() {
+                    child.generate(generator);
+                }
+            } 
+            Statement::Function(name, children) => {
+                let op = Op::single(OpKind::Proc, Operand::Symbol(name.clone().to_lowercase()));
 
-impl BlockStatement {
-    pub fn new() -> Self {
-        Self { children: vec![] }
-    }
-
-    pub fn append(&mut self, stmt: Box<dyn Statement>) {
-        self.children.push(stmt);
-    }
-}
-
-impl Statement for BlockStatement {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "BlockStatement:".into());
-        for (_, child) in self.children.iter().enumerate() {
-            child.print(indent + 1);
-        }
-    }
-
-    fn generate(&self, generator: &mut Generator) {
-        generator.label_auto();
+                generator.append(op);
         
-        for (_, child) in self.children.iter().enumerate() {
-            child.generate(generator);
-        }
-    }
-}
-
-pub struct FunctionStatement {
-    children: Vec<Box<dyn Statement>>,
-    name: Identifier,
-}
-
-impl FunctionStatement {
-    pub fn new(name: Identifier) -> Self {
-        Self {
-            name,
-            children: vec![],
-        }
-    }
-
-    pub fn append(&mut self, stmt: Box<dyn Statement>) {
-        self.children.push(stmt);
-    }
-}
-
-impl Statement for FunctionStatement {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "FunctionStatement:".into());
-        self.name.print(indent + 1);
-        util::print_indent(indent + 1, "Children:".into());
-        for (_, child) in self.children.iter().enumerate() {
-            child.print(indent + 2);
-        }
-    }
-
-    fn generate(&self, generator: &mut Generator) {
-        generator.label(self.name.inner().to_lowercase());
-        
-        for (_, child) in self.children.iter().enumerate() {
-            child.generate(generator);
-        }
-        
-        generator.append(Op::none(OpKind::LabelEnd));
-    }
-
-}
-
-pub struct ExpressionStatement {
-    expr: Box<dyn Expression>,
-}
-
-impl ExpressionStatement {
-    pub fn new(expr: Box<dyn Expression>) -> Self {
-        Self { expr }
-    }
-}
-
-impl Statement for ExpressionStatement {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "ExpressionStatement:".into());
-        self.expr.print(indent + 1);
-    }
-
-    fn generate(&self, generator: &mut Generator) {
-        self.expr.generate(generator);
-    }
-}
-
-pub struct DeclarationStatement {
-    identifier: Identifier,
-    expr: Box<dyn Expression>,
-}
-
-impl DeclarationStatement {
-    pub fn new(identifier: Identifier, expr: Box<dyn Expression>) -> Self {
-        Self { identifier, expr }
-    }
-}
-
-impl Statement for DeclarationStatement {
-    fn print(&self, indent: usize) {
-        util::print_indent(indent, "DeclarationStatement:".into());
-        self.identifier.print(indent + 1);
-        self.expr.print(indent + 1);
-    }
-
-    fn generate(&self, generator: &mut Generator) {
-        self.expr.generate(generator);
-        let op = Op::single(OpKind::NewVariable, Operand::Symbol(self.identifier.inner()));
-        generator.append(op);
-    }
+                for child in children.iter() {
+                    child.generate(generator);
+                }
+                
+                generator.append(Op::none(OpKind::End));
+            }
+            Statement::Expression(expr) => {
+                expr.generate(generator);
+            }
+            Statement::Declaration(name, expr) => {
+                expr.generate(generator);
+                let op = Op::single(OpKind::NewVariable, Operand::Symbol(name.clone()));
+                generator.append(op);
+            }
+        }        
+    }     
 }

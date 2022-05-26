@@ -1,4 +1,4 @@
-use super::op::{Op, OpKind, Operand};
+use super::op::{Op};
 
 pub struct Generator {
     ops: Vec<Op>,
@@ -15,22 +15,10 @@ impl Generator {
         }
     }
 
-    pub fn label(&mut self, name: String) {
-        let op = Op::single(OpKind::Label, Operand::Symbol(name));
-
-        self.ops.push(op);
-    }
-
     pub fn allocate_label(&mut self) -> String {
         let name = format!("block_{}", self.label_count);
         self.label_count += 1;
         name
-    }
-
-    pub fn label_auto(&mut self) {
-        let op = Op::single(OpKind::Label, Operand::Symbol(self.allocate_label()));
-
-        self.ops.push(op);
     }
 
     pub fn append(&mut self, op: Op) {

@@ -1,10 +1,14 @@
 use std::collections::HashMap;
+use std::iter::Iterator;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum TokenKind {
     Literal,
     Identifier,
     StringLiteral,
+
+    Percent,
+    Semicolon,
 
     Assignment,
     Let,
@@ -17,8 +21,24 @@ pub enum TokenKind {
     Div,
     Mul,
 
+    Greater,
+    GreaterEquals,
+    Less,
+    LessEquals,
+    NotEquals,
+    Equals,
+    Not,
+
+    And,
+    Or,
+
+    True,
+    False,
+
     LeftParen,
     RightParen,
+
+    Eof,
 }
 
 #[derive(Debug, Clone)]
@@ -30,7 +50,7 @@ pub struct Token {
     pub col: usize,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Lexer {
     pub source: String,
     pub start: usize,
@@ -48,6 +68,9 @@ impl TokenKind {
             TokenKind::Identifier => "identifier".into(),
             TokenKind::StringLiteral => "string literal".into(),
 
+            TokenKind::Percent => "%".into(),
+            TokenKind::Semicolon => ";".into(),
+
             TokenKind::Assignment => "assignment".into(),
             TokenKind::Let => "let".into(),
 
@@ -59,8 +82,24 @@ impl TokenKind {
             TokenKind::Div => "/".into(),
             TokenKind::Mul => "*".into(),
 
+            TokenKind::Greater => ">".into(),
+            TokenKind::GreaterEquals => ">=".into(),
+            TokenKind::Less => "<".into(),
+            TokenKind::LessEquals => "<=".into(),
+            TokenKind::NotEquals => "!=".into(),
+            TokenKind::Equals => "==".into(),
+            TokenKind::Not => "!".into(),
+
+            TokenKind::And => "and".into(),
+            TokenKind::Or => "or".into(),
+
+            TokenKind::True => "true".into(),
+            TokenKind::False => "false".into(),
+
             TokenKind::RightParen => ")".into(),
             TokenKind::LeftParen => "(".into(),
+
+            TokenKind::Eof => "eof".into(),
         }
     }
 }
@@ -108,6 +147,10 @@ impl Lexer {
         keywords.insert("let".into(), TokenKind::Let);
         keywords.insert("do".into(), TokenKind::Do);
         keywords.insert("end".into(), TokenKind::End);
+        keywords.insert("and".into(), TokenKind::And);
+        keywords.insert("or".into(), TokenKind::Or);
+        keywords.insert("true".into(), TokenKind::True);
+        keywords.insert("false".into(), TokenKind::False);
 
         Self {
             source: source.into(),
@@ -118,73 +161,6 @@ impl Lexer {
             col: 1,
             row: 1,
         }
-    }
-
-    pub fn next(&mut self) -> Token {
-        let c = self.peek();
-        self.start = self.current;
-
-        let token = match c {
-            '\n' => {
-                self.row += 1;
-                self.col = 0;
-                self.advance();
-                self.next()
-            }
-            ')' => {
-                let token = Token::kind_loc(TokenKind::RightParen, self.row, self.col);
-                self.advance();
-                token
-            }
-            '(' => {
-                let token = Token::kind_loc(TokenKind::LeftParen, self.row, self.col);
-                self.advance();
-                token
-            }
-            '=' => {
-                let token = Token::kind_loc(TokenKind::Assignment, self.row, self.col);
-                self.advance();
-                token
-            }
-            '+' => {
-                let token = Token::kind_loc(TokenKind::Add, self.row, self.col);
-                self.advance();
-                token
-            }
-            '-' => {
-                let token = Token::kind_loc(TokenKind::Sub, self.row, self.col);
-                self.advance();
-                token
-            }
-            '/' => {
-                let token = Token::kind_loc(TokenKind::Div, self.row, self.col);
-                self.advance();
-                token
-            }
-            '*' => {
-                let token = Token::kind_loc(TokenKind::Mul, self.row, self.col);
-                self.advance();
-                token
-            }
-            ' ' => {
-                self.advance();
-                self.next()
-            }
-            '\t' => {
-                self.advance();
-                self.next()
-            }
-            '"' => self.string(),
-            _ => {
-                if c.is_digit(10) {
-                    return self.numeric();
-                }
-
-                self.identifier()
-            }
-        };
-
-        token
     }
 
     pub fn numeric(&mut self) -> Token {
@@ -287,6 +263,118 @@ impl Lexer {
             return '\0';
         }
         return self.source.chars().nth(self.current).unwrap();
+    }
+}
+
+impl Iterator for Lexer {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Token> {
+        if self.current >= self.source.len() {
+            return Some(Token::kind_loc(TokenKind::Eof, self.row, self.col));
+        }
+
+        let c = self.peek();
+        self.start = self.current;
+
+        let token = match c {
+            '\n' => {
+                self.row += 1;
+                self.col = 0;
+                self.advance();
+                self.next()
+            }
+            ';' => {
+                let token = Token::kind_loc(TokenKind::Semicolon, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '%' => {
+                let token = Token::kind_loc(TokenKind::Percent, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            ')' => {
+                let token = Token::kind_loc(TokenKind::RightParen, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '(' => {
+                let token = Token::kind_loc(TokenKind::LeftParen, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '=' => {
+                let token = Token::kind_loc(TokenKind::Assignment, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '+' => {
+                let token = Token::kind_loc(TokenKind::Add, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '>' => {
+                let row = self.row;
+                let col = self.col;
+                self.advance();
+                if self.peek() == '=' {
+                    self.advance();
+                    Some(Token::kind_loc(TokenKind::GreaterEquals, row, col))
+                } else {
+                    Some(Token::kind_loc(TokenKind::Greater, row, col)) 
+                }
+            }
+            '<' => {
+                let row = self.row;
+                let col = self.col;
+                self.advance();
+                if self.peek() == '=' {
+                    self.advance();
+                    Some(Token::kind_loc(TokenKind::LessEquals, row, col))
+                } else {
+                    Some(Token::kind_loc(TokenKind::Less, row, col))
+                }
+            }
+            '!' => {
+                let token = Token::kind_loc(TokenKind::Not, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '-' => {
+                let token = Token::kind_loc(TokenKind::Sub, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '/' => {
+                let token = Token::kind_loc(TokenKind::Div, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '*' => {
+                let token = Token::kind_loc(TokenKind::Mul, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            ' ' => {
+                self.advance();
+                self.next()
+            }
+            '\t' => {
+                self.advance();
+                self.next()
+            }
+            '"' => Some(self.string()),
+            _ => {
+                if c.is_digit(10) {
+                    return Some(self.numeric());
+                }
+
+                return Some(self.identifier());
+            }
+        };
+
+        token
     }
 }
 
