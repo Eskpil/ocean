@@ -125,20 +125,25 @@ impl Parser {
         Ok(literal)
     }
 
-    pub fn parse_expression(&mut self, binding_power: u8) -> ParseResult<Expression> {
-        let mut lhs = match self.peek() {
-            lit @ TokenKind::Literal
-                | lit @ TokenKind::Identifier
-                | lit @ TokenKind::True
-                | lit @ TokenKind::False => self.parse_literal(lit)?,
-            _ => {
-               let token = self.next_token()?;
-                return Err(SyntaxError::UnexpectedToken {
-                    expected: "expression".to_string(),
-                    found: token,
-                });
+    pub fn parse_expression(&mut self, binding_power: u8, provided_lhs: Option<Expression>) -> ParseResult<Expression> {
+        let mut lhs = match provided_lhs {
+            Some(e) => e,
+            None => {
+                match self.peek() {
+                    lit @ TokenKind::Literal
+                        | lit @ TokenKind::Identifier
+                        | lit @ TokenKind::True
+                        | lit @ TokenKind::False => self.parse_literal(lit)?,
+                    _ => {
+                       let token = self.next_token()?;
+                        return Err(SyntaxError::UnexpectedToken {
+                            expected: "expression".to_string(),
+                            found: token,
+                        });
+                    }
+                }
             }
-        };
+        }; 
 
         if self.at(TokenKind::LeftParen) {
             return self.parse_function_call(lhs);
@@ -172,8 +177,8 @@ impl Parser {
                     return Err(SyntaxError::UnexpectedToken {
                         expected: "operator or expression terminator".to_string(),
                         found: token,
-                    });
-                }
+                });
+            }
             };
 
               if let Some((left_binding_power, ())) = op.postfix_binding_power() {
@@ -199,7 +204,7 @@ impl Parser {
 
                 self.consume(op)?;
 
-                let rhs = self.parse_expression(right_binding_power)?;
+                let rhs = self.parse_expression(right_binding_power, None)?;
                 lhs = Expression::Binary(BinaryOp::from_token_kind(&op), Box::new(lhs), Box::new(rhs));
 
                 // parsed an operator --> go round the loop again
@@ -230,7 +235,7 @@ impl Parser {
             if self.multi_at(&[TokenKind::Identifier, TokenKind::Let, TokenKind::Do, TokenKind::While]) {
                 body.push(self.parse_statement()?);  
             } else {
-                let expr = self.parse_expression(0)?;
+                let expr = self.parse_expression(0, None)?;
                 let stmt = Statement::Expression(expr);
                 body.push(stmt);
             }
@@ -254,21 +259,25 @@ impl Parser {
     }
 
     pub fn parse_ident_begin(&mut self) -> ParseResult<Statement> {
-        let ident = self.next_token().unwrap();  
+        let ident_value = self.next_token().unwrap().value.clone();
+        let ident = Expression::Identifier(ident_value.clone());
 
         let stmt = match self.peek() {
             TokenKind::Do => {
                 let block = self.parse_block_body()?;         
-                let stmt = Statement::Function(ident.value.clone(), block);
+                let stmt = Statement::Function(ident_value, block);
                 stmt
             } 
             TokenKind::LeftParen => {
-                let ident_expr = Expression::Identifier(ident.value.clone());
-                let expr = self.parse_function_call(ident_expr)?;
+                let expr = self.parse_function_call(ident)?;
                 let stmt = Statement::Expression(expr);
                 stmt
             }
-            token => unimplemented!("Token: {:?} is not implemented yet.", token)
+            _ => {
+                let expr = self.parse_expression(0, Some(ident))?;
+                let stmt = Statement::Expression(expr);
+                stmt
+            }
         };
 
         Ok(stmt)
@@ -281,7 +290,7 @@ impl Parser {
 
         if self.at(TokenKind::Assignment) {
             self.consume(TokenKind::Assignment)?;
-            expr = self.parse_expression(0)?;
+            expr = self.parse_expression(0, None)?;
         }
 
         return Ok(Statement::Declaration(ident, expr));
@@ -290,7 +299,7 @@ impl Parser {
     pub fn parse_while_loop(&mut self) -> ParseResult<Statement> {
         self.consume(TokenKind::While)?;
         
-        let expr = self.parse_expression(0)?;
+        let expr = self.parse_expression(0, None)?;
         
         let body = self.parse_block_body()?;
         
@@ -305,6 +314,11 @@ impl Parser {
             TokenKind::Let => self.parse_let_statement(),
             TokenKind::Do => self.parse_block(),
             TokenKind::While => self.parse_while_loop(),
+            TokenKind::Literal => {
+                let expr = self.parse_expression(0, None)?;
+                let stmt = Statement::Expression(expr);
+                Ok(stmt)
+            }
             TokenKind::Eof => Err(SyntaxError::End),
             token => todo!("Token: {:?} not implemented yet.", token)
         }
