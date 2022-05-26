@@ -290,16 +290,10 @@ impl Parser {
     pub fn parse_while_loop(&mut self) -> ParseResult<Statement> {
         self.consume(TokenKind::While)?;
         
-        println!("Before expression");
-
         let expr = self.parse_expression(0)?;
         
-        println!("Expression: {:?}", expr);
-
         let body = self.parse_block_body()?;
         
-        println!("Body: {:?}", body);
-
         let stmt = Statement::While(expr, body);
 
         Ok(stmt)
