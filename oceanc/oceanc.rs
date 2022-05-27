@@ -36,7 +36,7 @@ fn main() {
                 if let SyntaxError::End = err {
                     break;
                 } else {
-                    eprintln!("Encountered unexepected error: {:?}", err);
+                    panic!("Encountered unexepected error: {:?}", err);
                     process::exit(1);
                 } 
             }

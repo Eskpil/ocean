@@ -50,6 +50,10 @@ impl Operator for TokenKind {
     }
 }
 
+pub fn ending_token_kind_for(kind: TokenKind) -> TokenKind {
+    if kind == TokenKind::Then { return TokenKind::Else; }
+    return TokenKind::End;
+}
 
 impl Parser {
     pub fn new(input: String) -> Self {
@@ -170,6 +174,8 @@ impl Parser {
                 TokenKind::RightParen
                 | TokenKind::Let
                 | TokenKind::End
+                | TokenKind::Else
+                | TokenKind::Then
                 | TokenKind::Semicolon
                 | TokenKind::Do 
                 | TokenKind::Eof => break,
@@ -229,12 +235,18 @@ impl Parser {
         Ok(expr)
     }
 
-    pub fn parse_block_body(&mut self) -> ParseResult<Vec<Statement>> {
-        self.consume(TokenKind::Do)?;
+    pub fn parse_block_body(&mut self, should_consume: bool) -> ParseResult<Vec<Statement>> {
+        if self.peek() == TokenKind::Then {
+            self.consume(TokenKind::Then)?;
+        } else if self.peek() == TokenKind::Else {
+            self.consume(TokenKind::Else)?;
+        } else {
+            self.consume(TokenKind::Do)?;
+        }
         let mut body = Vec::<Statement>::new();
 
-        while !self.at(TokenKind::End) {
-            if self.multi_at(&[TokenKind::Identifier, TokenKind::Let, TokenKind::Do, TokenKind::While]) {
+        while !self.multi_at(&[TokenKind::End, TokenKind::Else]) {
+            if self.multi_at(&[TokenKind::Identifier, TokenKind::If, TokenKind::Let, TokenKind::Do, TokenKind::While]) {
                 body.push(self.parse_statement()?);  
             } else {
                 let expr = self.parse_expression(0, None)?;
@@ -249,13 +261,15 @@ impl Parser {
             self.consume(TokenKind::Semicolon)?;
         }
 
-        self.consume(TokenKind::End)?;
+        if should_consume == true {
+            self.consume(TokenKind::End)?;
+        } 
 
         Ok(body)
     }
     
-    pub fn parse_block(&mut self) -> ParseResult<Statement> {
-        let body = self.parse_block_body()?;    
+    pub fn parse_block(&mut self, should_consume: bool) -> ParseResult<Statement> {
+        let body = self.parse_block_body(should_consume)?;    
         let stmt = Statement::Block(body);
 
         Ok(stmt)
@@ -267,7 +281,7 @@ impl Parser {
 
         let stmt = match self.peek() {
             TokenKind::Do => {
-                let block = self.parse_block_body()?;         
+                let block = self.parse_block_body(true)?;         
                 let stmt = Statement::Function(ident_value, block);
                 stmt
             } 
@@ -299,12 +313,28 @@ impl Parser {
         return Ok(Statement::Declaration(ident, expr));
     }
 
+    pub fn parse_if_statement(&mut self) -> ParseResult<Statement> {
+        self.consume(TokenKind::If)?; 
+        let cond = self.parse_expression(0, None)?;
+        let if_block = self.parse_block_body(false)?;
+        let mut else_block: Option<Vec<Statement>> = None;
+
+        if self.peek() == TokenKind::Else {
+            let block = self.parse_block_body(true)?;
+            else_block = Some(block);
+        }
+
+        let stmt = Statement::If(cond, if_block, else_block);
+
+        return Ok(stmt);
+    }
+
     pub fn parse_while_loop(&mut self) -> ParseResult<Statement> {
         self.consume(TokenKind::While)?;
         
         let expr = self.parse_expression(0, None)?;
         
-        let body = self.parse_block_body()?;
+        let body = self.parse_block_body(true)?;
         
         let stmt = Statement::While(expr, body);
 
@@ -315,7 +345,8 @@ impl Parser {
         match self.peek() {
             TokenKind::Identifier => self.parse_ident_begin(),
             TokenKind::Let => self.parse_let_statement(),
-            TokenKind::Do => self.parse_block(),
+            TokenKind::Do => self.parse_block(true),
+            TokenKind::If => self.parse_if_statement(),
             TokenKind::While => self.parse_while_loop(),
             TokenKind::Literal => {
                 let expr = self.parse_expression(0, None)?;

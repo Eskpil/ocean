@@ -1,5 +1,5 @@
 " Vim syntax file
-" Language: Porth
+" Language: Ocean 
 
 " Usage Instructions
 " Put this file in .vim/syntax/ocean.vim
@@ -14,7 +14,7 @@ set iskeyword=a-z,A-Z,-,*,_,!,@
 syntax keyword oceanTodos TODO XXX FIXME NOTE
 
 " Language keywords
-syntax keyword oceanKeywords let do end 
+syntax keyword oceanKeywords if else let do end while and or then 
 
 " Comments
 syntax region oceanCommentLine start="//" end="$"   contains=oceanTodos
@@ -29,10 +29,10 @@ syntax region oceanChar start=/\v'/ skip=/\v\\./ end=/\v'/ contains=oceanEscapes
 syntax match oceanEscapes display contained "\\[nr\"']"
 
 " Number literals
-syntax region oceanNumber start=/\s\d/ skip=/\d/ end=/\s/
+syntax match oceanNumber "\d\+"
 
 " Type names the compiler recognizes
-syntax keyword oceanTypeNames addr int ptr bool
+syntax keyword oceanTypeNames int bool true false
 " Set highlights
 highlight default link oceanTodos Todo
 highlight default link oceanKeywords Keyword

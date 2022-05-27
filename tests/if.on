@@ -1,0 +1,9 @@
+Program do
+    if true then
+        let happy = true;
+    else
+        let happy = false;
+    end;
+    let a = 1 + 2;
+end
+

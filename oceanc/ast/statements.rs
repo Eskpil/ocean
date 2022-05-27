@@ -6,6 +6,7 @@ use crate::ir::{op::{Op, OpKind, Operand}, generator::{Generator}};
 pub enum Statement {
     Program(Vec<Statement>),
     Block(Vec<Statement>),
+    If(Expression, Vec<Statement>, Option<Vec<Statement>>),
     Function(String, Vec<Statement>),
     Expression(Expression),
     While(Expression, Vec<Statement>),
@@ -25,6 +26,22 @@ impl Statement {
                 util::print_indent(indent, "BlockStatement:".into());
                 for child in children.iter() {
                     child.print(indent + 1);
+                }
+            }
+            Statement::If(cond, if_block, else_block) => {
+                util::print_indent(indent, "IfStatement:".into());
+                util::print_indent(indent + 1, "Condition:".into());
+                cond.print(indent + 2);
+                util::print_indent(indent + 1, "IfBlock:".into());
+                for child in if_block.iter() {
+                    child.print(indent + 2);
+                }
+
+                if let Some(block) = else_block {
+                    util::print_indent(indent + 1, "ElseBlock:".into());    
+                    for child in block.iter() {
+                        child.print(indent + 2);
+                    }
                 }
             }
             Statement::Function(name, children) => {
@@ -77,6 +94,34 @@ impl Statement {
                     child.generate(generator);
                 }
             } 
+            Statement::If(cond, if_block, else_block) => {
+                let end_label = generator.allocate_label(); 
+                let if_label = generator.allocate_label();
+                cond.generate(generator);
+
+                if let Some(block) = else_block {
+                    let else_label = generator.allocate_label();
+                    generator.append(Op::single(OpKind::JumpUnless, Operand::Symbol(else_label.clone())));
+
+                    generator.append(Op::single(OpKind::Block, Operand::Symbol(if_label.clone())));
+                    for child in if_block.iter() {
+                        child.generate(generator);
+                    }
+
+                    generator.append(Op::single(OpKind::Block, Operand::Symbol(else_label.clone())));
+                    for child in block.iter() {
+                        child.generate(generator);
+                    }
+                } else {
+                    generator.append(Op::single(OpKind::JumpUnless, Operand::Symbol(end_label.clone())));
+                    generator.append(Op::single(OpKind::Block, Operand::Symbol(if_label.clone())));
+                    for child in if_block.iter() {
+                        child.generate(generator);
+                    }
+            }
+
+                generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
+            }
             Statement::Function(name, children) => {
                 let op = Op::single(OpKind::Proc, Operand::Symbol(name.clone().to_lowercase()));
 

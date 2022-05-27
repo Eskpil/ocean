@@ -16,6 +16,10 @@ pub enum TokenKind {
     Do,
     End,
 
+    If,
+    Else,
+    Then,
+
     Add,
     Sub,
     Div,
@@ -78,6 +82,10 @@ impl TokenKind {
 
             TokenKind::Do => "do".into(),
             TokenKind::End => "end".into(),
+            TokenKind::Then => "then".into(),
+
+            TokenKind::If => "if".into(),
+            TokenKind::Else => "else".into(),
 
             TokenKind::Add => "+".into(),
             TokenKind::Sub => "-".into(),
@@ -156,6 +164,9 @@ impl Lexer {
         keywords.insert("true".into(), TokenKind::True);
         keywords.insert("false".into(), TokenKind::False);
         keywords.insert("while".into(), TokenKind::While);
+        keywords.insert("if".into(), TokenKind::If);
+        keywords.insert("else".into(), TokenKind::Else);
+        keywords.insert("then".into(), TokenKind::Then);
 
         Self {
             source: source.into(),

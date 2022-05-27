@@ -2,5 +2,5 @@ Program do
   let test = true;
   let a = 2;
   let b = 2;
-  let c = a + b
+  let c = a + b;
 end 
