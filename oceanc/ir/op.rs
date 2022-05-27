@@ -7,6 +7,8 @@ pub enum OpKind {
     End,
     Call,
 
+    NewString,
+
     ResolveVariable,
     NewVariable,
 
@@ -22,6 +24,7 @@ pub enum OpKind {
 pub enum Operand {
     Uint(u64),
     Symbol(String),
+    Data(String),
     Op(BinaryOp),
 }
 
@@ -49,6 +52,13 @@ impl Operand {
     pub fn as_op(&self) -> BinaryOp {
         match self {
             Operand::Op(op) => op.clone(),
+            o => unreachable!("Expected OpKind::Op but found OpKind::{:?}", o),
+        }
+    }
+
+    pub fn as_data(&self) -> String {
+        match self {
+            Operand::Data(d) => d.clone(),
             o => unreachable!("Expected OpKind::Op but found OpKind::{:?}", o),
         }
     }

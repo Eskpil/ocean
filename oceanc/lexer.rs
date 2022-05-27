@@ -170,6 +170,7 @@ impl Lexer {
 
     pub fn numeric(&mut self) -> Token {
         let col = self.col;
+        let row = self.row;
         while self.peek().is_digit(10) {
             self.advance();
         }
@@ -186,7 +187,7 @@ impl Lexer {
         let token = Token {
             kind: TokenKind::Literal,
             value: value.into(),
-            row: self.row,
+            row,
             col,
         };
 
@@ -195,6 +196,7 @@ impl Lexer {
 
     pub fn identifier(&mut self) -> Token {
         let col = self.col;
+        let row = self.row;
         while self.peek().is_alphabetic() || self.peek().is_digit(10) {
             self.advance();
         }
@@ -204,7 +206,7 @@ impl Lexer {
         let mut token = Token {
             kind: TokenKind::Identifier,
             value: value.into(),
-            row: self.row,
+            row,
             col,
         };
 
@@ -220,6 +222,7 @@ impl Lexer {
 
     pub fn string(&mut self) -> Token {
         let col = self.col;
+        let row = self.row;
 
         /* Advance to consume the first " in the literal. */
         self.advance();
@@ -237,7 +240,7 @@ impl Lexer {
         Token {
             kind: TokenKind::StringLiteral,
             value: value.into(),
-            row: self.row,
+            row,
             col,
         }
     }
@@ -287,8 +290,7 @@ impl Iterator for Lexer {
                 self.row += 1;
                 self.col = 0;
                 self.advance();
-                self.next()
-            }
+                self.next()            }
             ';' => {
                 let token = Token::kind_loc(TokenKind::Semicolon, self.row, self.col);
                 self.advance();

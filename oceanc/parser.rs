@@ -119,6 +119,7 @@ impl Parser {
             TokenKind::True => Expression::Bool(true),
             TokenKind::False => Expression::Bool(false),
             TokenKind::Identifier => Expression::Identifier(token.value.clone()),
+            TokenKind::StringLiteral => Expression::StringLiteral(token.value.clone()),
             token => unimplemented!("Error handeling or token: {:?}", token)
         };
 
@@ -131,11 +132,12 @@ impl Parser {
             None => {
                 match self.peek() {
                     lit @ TokenKind::Literal
+                        | lit @ TokenKind::StringLiteral
                         | lit @ TokenKind::Identifier
                         | lit @ TokenKind::True
                         | lit @ TokenKind::False => self.parse_literal(lit)?,
                     _ => {
-                       let token = self.next_token()?;
+                        let token = self.next_token()?;
                         return Err(SyntaxError::UnexpectedToken {
                             expected: "expression".to_string(),
                             found: token,
@@ -228,7 +230,7 @@ impl Parser {
     }
 
     pub fn parse_block_body(&mut self) -> ParseResult<Vec<Statement>> {
-        self.consume_next(TokenKind::Do);
+        self.consume(TokenKind::Do)?;
         let mut body = Vec::<Statement>::new();
 
         while !self.at(TokenKind::End) {
@@ -243,10 +245,11 @@ impl Parser {
             if !self.at(TokenKind::Semicolon) {
                 break;
             }
+
             self.consume(TokenKind::Semicolon)?;
         }
 
-        self.consume_next(TokenKind::End)?;
+        self.consume(TokenKind::End)?;
 
         Ok(body)
     }

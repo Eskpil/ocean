@@ -58,7 +58,7 @@ impl NasmBackend {
                 }
                 OpKind::End => {
                     // Clear our stack garbage.
-                    for i in 0..self.current.count {
+                    for i in 0..self.current.gc_count {
                         write!(self.output, "    pop rax\n");
                     }
 
@@ -70,7 +70,7 @@ impl NasmBackend {
                     write!(self.output, "    mov rax, {}\n", value);
                     write!(self.output, "    push rax\n");
                     // We have pushed a value onto the stack.
-                    self.current.count += 1;
+                    self.current.gc_count += 1;
                 }
                 OpKind::Intrinsic => {
                     let binary_op = op.operands()[0].as_op();
@@ -81,7 +81,7 @@ impl NasmBackend {
                             write!(self.output, "    add rax, rbx\n");
                             write!(self.output, "    push rax\n");
                             // 2 - 1 = 1. We have taken one element of the stack.
-                            self.current.count -= 1;
+                            self.current.gc_count -= 1;
                         }
                         BinaryOp::Mul => {
                             write!(self.output, "    pop rax\n");
@@ -89,7 +89,7 @@ impl NasmBackend {
                             write!(self.output, "    imul rax, rbx\n");
                             write!(self.output, "    push rax\n");
                             // 2 - 1 = 1. We have taken one element of the stack.
-                            self.current.count -= 1;                           
+                            self.current.gc_count -= 1;                           
                         }
                         BinaryOp::Div => {
                             write!(self.output, "   pop rax\n"); // What we are dividing by.
@@ -99,7 +99,7 @@ impl NasmBackend {
                             write!(self.output, "   div rax\n");
                             write!(self.output, "   push rbx\n");
                             // 2 - 1 = 1. We have taken one element of the stack.
-                            self.current.count -= 1;                           
+                            self.current.gc_count -= 1;                           
                         }
                         BinaryOp::Sub => {
                             write!(self.output, "   pop rax\n"); // What we are subtracting with.
@@ -107,7 +107,7 @@ impl NasmBackend {
                             write!(self.output, "   sub rax, rbx\n");
                             write!(self.output, "   push rax\n");
                             // 2 - 1 = 1. We have taken one element of the stack.
-                            self.current.count -= 1;                           
+                            self.current.gc_count -= 1;                           
                         }
                         BinaryOp::Greater => {
                            write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
@@ -117,7 +117,7 @@ impl NasmBackend {
                            write!(self.output, "    movzx rax, al\n");
                            write!(self.output, "    push rax\n");
                            // 2 - 1 = 1. We have taken one element of the stack.
-                           self.current.count -= 1;
+                           self.current.gc_count -= 1;
                         }
                         BinaryOp::GreaterEquals => {
                            write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
@@ -127,7 +127,7 @@ impl NasmBackend {
                            write!(self.output, "    movzx rax, al\n");
                            write!(self.output, "    push rax\n");  
                            // 2 - 1 = 1. We have taken one element of the stack.
-                           self.current.count -= 1;
+                           self.current.gc_count -= 1;
                         }
                         BinaryOp::Less => {
                            write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
@@ -137,7 +137,7 @@ impl NasmBackend {
                            write!(self.output, "    movzx rax, al\n");
                            write!(self.output, "    push rax\n");
                            // 2 - 1 = 1. We have taken one element of the stack.
-                           self.current.count -= 1;
+                           self.current.gc_count -= 1;
                         }
                         BinaryOp::LessEquals => {
                            write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
@@ -147,7 +147,7 @@ impl NasmBackend {
                            write!(self.output, "    movzx rax, al\n");
                            write!(self.output, "    push rax\n");
                            // 2 - 1 = 1. We have taken one element of the stack.
-                           self.current.count -= 1;
+                           self.current.gc_count -= 1;
 
                         }
                         o => todo!("Implement instrinsic: {:?}", o),
@@ -155,19 +155,26 @@ impl NasmBackend {
                 }
                 OpKind::NewVariable => {
                     let symbol = op.operands()[0].as_symbol();
-                    let var_name = self.current.append(symbol);
+                    let variable = self.current.append_variable(symbol, 8);
                     write!(self.output, "    pop rax\n");
-                    write!(self.output, "    mov [rel {}], rax\n", var_name);
+                    write!(self.output, "    mov [rel {}], rax\n", variable.scoped_name);
                     // We have taken one value of the stack and moved it into a variable.
-                    if self.current.count >= 1 { self.current.count -= 1; }
+                    if self.current.gc_count >= 1 { self.current.gc_count -= 1; }
                 }
                 OpKind::ResolveVariable => {
                     let symbol = op.operands()[0].as_symbol();
-                    let var_name = self.current.find(symbol.clone());
-                    write!(self.output, "    lea rax, [rel {}]\n", var_name);
+                    let variable = self.current.find_variable(symbol.clone());
+                    write!(self.output, "    lea rax, [rel {}]\n", variable.scoped_name);
                     write!(self.output, "    push rax\n");
                     // We have resolved a value from a variables onto the stack.
-                    self.current.count += 1;
+                    self.current.gc_count += 1;
+                }
+                OpKind::NewString => {
+                    let data = op.operands()[0].as_data(); 
+                    let scoped_name = self.current.append_data(data.clone());
+                    write!(self.output, "    lea rax, [rel {}]\n", scoped_name);
+                    write!(self.output, "    push rax\n");
+                    self.current.gc_count += 1;
                 }
                 OpKind::Call => {
                     let symbol = op.operands()[0].as_symbol();
@@ -189,17 +196,26 @@ impl NasmBackend {
     }
 
     pub fn finish(&mut self) {
-        write!(self.output, "segment .bss\n");
         self.scopes.push(self.current.clone());
-        let mut variables = HashMap::<String, String>::new();
+        let mut bss = HashMap::<String, usize>::new();
+        let mut data = HashMap::<String, String>::new();
         for scope in self.scopes.iter() {
             for variable in scope.eject_variables() {
-                variables.insert(variable.0, variable.1);
+                bss.insert(variable.1.scoped_name, variable.1.size);
+            }
+            
+            for d in scope.eject_data() {
+                data.insert(d.0, d.1);
             }
         }
 
-        for variable in variables {
-            write!(self.output, "    {}: resb 8\n", variable.1);
+        write!(self.output, "segment .data\n");
+        for value in data {
+            write!(self.output, "    {}: db \"{}\"\n", value.0, value.1); 
         }
+        write!(self.output, "segment .bss\n");
+        for value in bss {
+            write!(self.output, "    {}: resb {}\n", value.0, value.1); 
+        }    
     }
 }

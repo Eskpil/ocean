@@ -11,6 +11,7 @@ pub enum Expression {
     Empty,
     Literal(u64),
     Bool(bool),
+    StringLiteral(String),
     Identifier(String),
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
     Unary(BinaryOp, Box<Expression>),
@@ -34,12 +35,16 @@ impl Expression {
                 util::print_indent(indent, "EmptyExpression".into());
             }
             Expression::Bool(v) => {
-                util::print_indent(indent, "Bool".into());
+                util::print_indent(indent, "Bool:".into());
                 util::print_indent(indent + 1, format!("{}", v));
             }
             Expression::Literal(v) => {
                 util::print_indent(indent, "Literal:".into());
                 util::print_indent(indent + 1, format!("{}", v));
+            }
+            Expression::StringLiteral(v) => {
+                util::print_indent(indent, "StringLiteral:".into());
+                util::print_indent(indent + 1, v);
             }
             Expression::Identifier(v) => {
                 util::print_indent(indent, "Identifier:".into());
@@ -83,8 +88,12 @@ impl Expression {
                 generator.append(op);
             }
             Expression::Literal(v) => {
-               let op = Op::single(OpKind::Push, Operand::Uint(v));
-               generator.append(op);
+                let op = Op::single(OpKind::Push, Operand::Uint(v));
+                generator.append(op);
+            }
+            Expression::StringLiteral(v) => {
+                let op  = Op::single(OpKind::NewString, Operand::Data(v));
+                generator.append(op);
             }
             Expression::Identifier(v) => {
                 let op = Op::single(OpKind::ResolveVariable, Operand::Symbol(v.clone()));
