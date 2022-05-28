@@ -197,7 +197,7 @@ impl NasmBackend {
 
     pub fn finish(&mut self) {
         self.scopes.push(self.current.clone());
-        let mut bss = HashMap::<String, usize>::new();
+        let mut bss = HashMap::<String, u64>::new();
         let mut data = HashMap::<String, String>::new();
         for scope in self.scopes.iter() {
             for variable in scope.eject_variables() {

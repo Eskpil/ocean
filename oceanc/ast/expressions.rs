@@ -10,6 +10,7 @@ use std::process;
 pub enum Expression {
     Empty,
     Literal(u64),
+    StructInit(String, Vec<Expression>),
     Bool(bool),
     StringLiteral(String),
     Identifier(String),
@@ -41,6 +42,15 @@ impl Expression {
             Expression::Literal(v) => {
                 util::print_indent(indent, "Literal:".into());
                 util::print_indent(indent + 1, format!("{}", v));
+            }
+            Expression::StructInit(name, arguments) => {
+                util::print_indent(indent, "StructInit:".into());
+                util::print_indent(indent + 1, "Name:".into());
+                util::print_indent(indent + 2, name);
+                util::print_indent(indent + 1, "Arguments".into());
+                for arg in arguments {
+                    arg.print(indent + 2);
+                }
             }
             Expression::StringLiteral(v) => {
                 util::print_indent(indent, "StringLiteral:".into());
@@ -79,6 +89,9 @@ impl Expression {
         match self.clone() {
             Expression::Empty => {
                                    
+            }
+            Expression::StructInit(_, _) => {
+                todo!("Expression::StructInit::generate");
             }
             Expression::Bool(v) => {
                 let mut op = Op::single(OpKind::Push, Operand::Uint(0));

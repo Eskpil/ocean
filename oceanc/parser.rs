@@ -1,4 +1,13 @@
-use crate::ast::{BinaryOp, expressions::{Expression}, statements::{Statement}};
+use crate::ast::{
+    BinaryOp, 
+    expressions::{Expression}, 
+    statements::{Statement}, 
+    definitions::{StructDefinition, 
+        Definition, 
+        FieldDefinition, 
+        DefinedType
+    }
+};
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::errors::syntax::SyntaxError;
 use std::iter::Peekable;
@@ -151,6 +160,10 @@ impl Parser {
             }
         }; 
 
+        if self.at(TokenKind::LeftBracket) {
+            return self.parse_struct_init(lhs);
+        }
+
         if self.at(TokenKind::LeftParen) {
             return self.parse_function_call(lhs);
         }
@@ -175,6 +188,8 @@ impl Parser {
                 | TokenKind::Let
                 | TokenKind::End
                 | TokenKind::Else
+                | TokenKind::Comma
+                | TokenKind::RightBracket
                 | TokenKind::Then
                 | TokenKind::Semicolon
                 | TokenKind::Do 
@@ -222,6 +237,24 @@ impl Parser {
         }
 
         Ok(lhs)
+    }
+
+    pub fn parse_struct_init(&mut self, lhs: Expression) -> ParseResult<Expression> {
+        self.consume(TokenKind::LeftBracket)?;
+        let mut arguments = Vec::<Expression>::new();
+        while !self.at(TokenKind::RightBracket) {
+            let expr = self.parse_expression(0, None)?; 
+            arguments.push(expr);
+            
+            if !self.at(TokenKind::Comma) {
+                break;
+            } else {
+                self.consume(TokenKind::Comma)?;
+            }
+        }
+        self.consume(TokenKind::RightBracket)?;
+        let expr = Expression::StructInit(lhs.as_identifier(), arguments);  
+        Ok(expr)
     }
 
     pub fn parse_function_call(&mut self, lhs: Expression) -> ParseResult<Expression> {
@@ -341,11 +374,37 @@ impl Parser {
         Ok(stmt)
     }
 
+    pub fn parse_definition(&mut self) -> ParseResult<Statement> {
+        self.consume(TokenKind::Struct)?;
+        let struct_name = self.consume_next(TokenKind::Identifier)?.value.clone();
+        let mut fields = Vec::<FieldDefinition>::new();
+        self.consume(TokenKind::Has)?;
+
+        while !self.at(TokenKind::End) {
+            let field_name = self.consume_next(TokenKind::Identifier)?.value.clone();  
+            self.consume(TokenKind::Colon);
+            let field_type = self.consume_next(TokenKind::Identifier)?.value.clone();
+            let defined_type = DefinedType::Name(field_type);
+
+            let field = FieldDefinition::new(field_name, defined_type);
+            fields.push(field);
+        }
+
+        self.consume(TokenKind::End)?;
+
+        let struct_definition = StructDefinition::new(struct_name, fields);
+        let definition = Definition::Struct(struct_definition);
+        let stmt = Statement::Define(definition);
+
+        Ok(stmt)
+    }
+
     pub fn parse_statement(&mut self) -> ParseResult<Statement> {
         match self.peek() {
             TokenKind::Identifier => self.parse_ident_begin(),
             TokenKind::Let => self.parse_let_statement(),
             TokenKind::Do => self.parse_block(true),
+            TokenKind::Struct => self.parse_definition(),
             TokenKind::If => self.parse_if_statement(),
             TokenKind::While => self.parse_while_loop(),
             TokenKind::Literal => {

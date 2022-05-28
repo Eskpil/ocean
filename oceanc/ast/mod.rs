@@ -1,5 +1,6 @@
 pub mod expressions;
 pub mod statements;
+pub mod definitions;
 mod util;
 
 use crate::lexer::TokenKind;

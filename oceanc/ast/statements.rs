@@ -1,10 +1,12 @@
 use super::expressions::{Expression};
+use super::definitions::{Definition};
 use super::util;
 use crate::ir::{op::{Op, OpKind, Operand}, generator::{Generator}};
 
 #[derive(Debug, Clone)]
 pub enum Statement {
     Program(Vec<Statement>),
+    Define(Definition),
     Block(Vec<Statement>),
     If(Expression, Vec<Statement>, Option<Vec<Statement>>),
     Function(String, Vec<Statement>),
@@ -21,6 +23,10 @@ impl Statement {
                 for child in children.iter() {
                     child.print(indent + 1);
                 }
+            }
+            Statement::Define(definition) => {
+                util::print_indent(indent, "Definition:".into());
+                definition.print(indent + 1);
             }
             Statement::Block(children) => {
                 util::print_indent(indent, "BlockStatement:".into());
@@ -83,6 +89,7 @@ impl Statement {
                     child.generate(generator);
                 }
             }
+            Statement::Define(_) => {},
             Statement::Block(children) => {
                 let label = generator.allocate_label();
 

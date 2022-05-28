@@ -9,12 +9,17 @@ pub enum TokenKind {
 
     Percent,
     Semicolon,
+    Comma,
 
     Assignment,
     Let,
 
     Do,
     End,
+
+    Struct,
+    Has,
+    Colon,
 
     If,
     Else,
@@ -40,9 +45,12 @@ pub enum TokenKind {
 
     True,
     False,
+    Bool,
 
     LeftParen,
     RightParen,
+    LeftBracket,
+    RightBracket,
 
     Eof,
 }
@@ -76,6 +84,7 @@ impl TokenKind {
 
             TokenKind::Percent => "%".into(),
             TokenKind::Semicolon => ";".into(),
+            TokenKind::Comma => ",".into(),
 
             TokenKind::Assignment => "assignment".into(),
             TokenKind::Let => "let".into(),
@@ -83,6 +92,10 @@ impl TokenKind {
             TokenKind::Do => "do".into(),
             TokenKind::End => "end".into(),
             TokenKind::Then => "then".into(),
+
+            TokenKind::Struct => "struct".into(),
+            TokenKind::Has => "has".into(),
+            TokenKind::Colon => ".".into(),
 
             TokenKind::If => "if".into(),
             TokenKind::Else => "else".into(),
@@ -107,9 +120,12 @@ impl TokenKind {
 
             TokenKind::True => "true".into(),
             TokenKind::False => "false".into(),
+            TokenKind::Bool => "bool".into(),
 
             TokenKind::RightParen => ")".into(),
             TokenKind::LeftParen => "(".into(),
+            TokenKind::RightBracket => "]".into(),
+            TokenKind::LeftBracket => "[".into(),
 
             TokenKind::Eof => "eof".into(),
         }
@@ -167,6 +183,9 @@ impl Lexer {
         keywords.insert("if".into(), TokenKind::If);
         keywords.insert("else".into(), TokenKind::Else);
         keywords.insert("then".into(), TokenKind::Then);
+        keywords.insert("struct".into(), TokenKind::Struct);
+        keywords.insert("has".into(), TokenKind::Has);
+        keywords.insert("bool".into(), TokenKind::Bool);
 
         Self {
             source: source.into(),
@@ -301,7 +320,18 @@ impl Iterator for Lexer {
                 self.row += 1;
                 self.col = 0;
                 self.advance();
-                self.next()            }
+                self.next()            
+            }
+            ',' => {
+                let token = Token::kind_loc(TokenKind::Comma, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            ':' => {
+                let token = Token::kind_loc(TokenKind::Colon, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
             ';' => {
                 let token = Token::kind_loc(TokenKind::Semicolon, self.row, self.col);
                 self.advance();
@@ -319,6 +349,16 @@ impl Iterator for Lexer {
             }
             '(' => {
                 let token = Token::kind_loc(TokenKind::LeftParen, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            ']' => {
+                let token = Token::kind_loc(TokenKind::RightBracket, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '[' => {
+                let token = Token::kind_loc(TokenKind::LeftBracket, self.row, self.col);
                 self.advance();
                 Some(token)
             }

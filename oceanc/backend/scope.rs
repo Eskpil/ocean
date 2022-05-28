@@ -3,7 +3,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct Variable {
     pub scoped_name: String,
-    pub size: usize,
+    pub size: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -55,7 +55,7 @@ impl BackendScope {
         scoped_name
     }
 
-    pub fn append_variable(&mut self, name: String, size: usize) -> Variable {
+    pub fn append_variable(&mut self, name: String, size: u64) -> Variable {
         let full_name = format!("{}_{}", self.name, name.clone());
         let variable = Variable { scoped_name: full_name, size };
         self.variables.insert(name, variable.clone());
