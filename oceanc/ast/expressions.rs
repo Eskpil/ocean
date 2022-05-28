@@ -91,7 +91,10 @@ impl Expression {
                                    
             }
             Expression::StructInit(_, _) => {
-                todo!("Expression::StructInit::generate");
+                // Find a way to get this information from type system.
+                let size = 16;
+                let op = Op::single(OpKind::NewStruct, Operand::Uint(size));
+                generator.append(op);
             }
             Expression::Bool(v) => {
                 let mut op = Op::single(OpKind::Push, Operand::Uint(0));

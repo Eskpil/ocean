@@ -1,6 +1,7 @@
 #include "gpa.h"
-#include <stdio.h>
+#include <stdlib.h>
 
-void hello() {
-    printf("hello!\n");
+extern void *gpa_allocate_sized(size_t size) {
+    void *memory = malloc(size);
+    return memory;
 }

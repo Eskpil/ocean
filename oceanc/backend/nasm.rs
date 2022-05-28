@@ -17,6 +17,7 @@ impl NasmBackend {
         let mut file = File::create(output_path).unwrap(); 
     
         write!(file, "BITS 64\n");
+        write!(file, "extern gpa_allocate_sized\n");
         write!(file, "segment .text\n");
         write!(file, "    global main\n");
         write!(file, "    main:\n");
@@ -175,6 +176,12 @@ impl NasmBackend {
                     write!(self.output, "    lea rax, [rel {}]\n", scoped_name);
                     write!(self.output, "    push rax\n");
                     self.current.gc_count += 1;
+                }
+                OpKind::NewStruct => {
+                    let size = op.operands()[0].as_uint();
+                    write!(self.output, "    mov rdi, {}\n", size);
+                    write!(self.output, "    call gpa_allocate_sized\n");
+                    write!(self.output, "    push rax\n");
                 }
                 OpKind::Call => {
                     let symbol = op.operands()[0].as_symbol();

@@ -62,6 +62,12 @@ fn main() {
     backend.generate_ops(ops);
     backend.finish();
 
+    // This is very bad. Runtime should definitily be install globally on the system
+    // and be versioned. For now this is fine since we are just developing the language
+    // and not actually using it.
+    let pwd = env::current_dir().unwrap().into_os_string().into_string().unwrap();
+    let runtime_link = format!("{pwd}/bld/runtime/runtime.so");
+
     util::run_cmd_echoed("nasm -felf64 test.asm".to_string());
-    util::run_cmd_echoed("gcc -o test ./test.o".to_string());
+    util::run_cmd_echoed(format!("gcc -no-pie -o test {runtime_link} ./test.o"));
 }

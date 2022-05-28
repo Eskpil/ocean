@@ -5,17 +5,5 @@
 #include <sys/mman.h>
 #include <stdint.h>
 
-#define BLOCK_SIZE 16 * 1024
+extern void *gpa_allocate_sized(size_t);
 
-typedef struct Block Block;
-typedef struct FreeListEntry FreeListEntry;
-
-struct FreeListEntry {
-    struct FreeListEntry *next;
-};
-
-struct Block {
-    size_t size;
-    size_t cell_size;
-    size_t cell_amount;
-};
