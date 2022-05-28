@@ -182,6 +182,7 @@ impl NasmBackend {
                     write!(self.output, "    mov rdi, {}\n", size);
                     write!(self.output, "    call gpa_allocate_sized\n");
                     write!(self.output, "    push rax\n");
+                    self.current.gc_count += 1;
                 }
                 OpKind::Call => {
                     let symbol = op.operands()[0].as_symbol();
