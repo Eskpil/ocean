@@ -16,7 +16,7 @@ pub enum Expression {
     Identifier(String),
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
     Unary(BinaryOp, Box<Expression>),
-    Call(String),
+    Call(String, Vec<Expression>),
 }
 
 impl Expression {
@@ -54,7 +54,7 @@ impl Expression {
             }
             Expression::StringLiteral(v) => {
                 util::print_indent(indent, "StringLiteral:".into());
-                util::print_indent(indent + 1, v);
+                util::print_indent(indent + 1, format!("\"{v}\""));
             }
             Expression::Identifier(v) => {
                 util::print_indent(indent, "Identifier:".into());
@@ -77,10 +77,14 @@ impl Expression {
                 util::print_indent(indent + 1, "expr".into());
                 expr.print(indent + 2);
             }
-            Expression::Call(name) => {
+            Expression::Call(name, arguments) => {
                 util::print_indent(indent, "CallExpression:".into());
                 util::print_indent(indent + 1, "Name:".into());
                 util::print_indent(indent + 2, name);
+                util::print_indent(indent + 1, "Arguments".into());
+                for arg in arguments {
+                    arg.print(indent + 2);
+                }
             }
         }    
     }
@@ -124,8 +128,16 @@ impl Expression {
             Expression::Unary(op, expr) => {
                 todo!("Generate unary expression");
             }
-            Expression::Call(name) => {
-                let op = Op::single(OpKind::Call, Operand::Symbol(name.clone().to_lowercase()));
+            Expression::Call(name, arguments) => {
+                for arg in arguments.iter() {
+                    arg.generate(generator);
+                }
+
+                let op = Op::double(
+                    OpKind::Call, 
+                    Operand::Symbol(name.clone().to_lowercase()), 
+                    Operand::Uint(arguments.len() as u64)
+                );
                 generator.append(op);
             }
         }

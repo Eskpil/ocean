@@ -10,6 +10,7 @@ use crate::ast::{
 };
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::errors::syntax::SyntaxError;
+use crate::unescape::{unescape};
 use std::iter::Peekable;
 
 type SyntaxResult<T> = Result<T, SyntaxError>;
@@ -132,7 +133,11 @@ impl Parser {
             TokenKind::True => Expression::Bool(true),
             TokenKind::False => Expression::Bool(false),
             TokenKind::Identifier => Expression::Identifier(token.value.clone()),
-            TokenKind::StringLiteral => Expression::StringLiteral(token.value.clone()),
+            TokenKind::StringLiteral => { 
+                let value = token.value.clone();
+                let unescaped = unescape(&value).unwrap();
+                Expression::StringLiteral(unescaped)
+            },
             token => unimplemented!("Error handeling or token: {:?}", token)
         };
 
@@ -259,11 +264,22 @@ impl Parser {
 
     pub fn parse_function_call(&mut self, lhs: Expression) -> ParseResult<Expression> {
         self.consume(TokenKind::RightParen); 
+        let mut arguments = Vec::<Expression>::new();
+        while !self.at(TokenKind::RightParen) {
+            let expr = self.parse_expression(0, None)?;
+            arguments.push(expr);
+
+            if !self.at(TokenKind::Comma) {
+                break;
+            } else {
+                self.consume(TokenKind::Comma)?;
+            }
+        }
         self.consume(TokenKind::LeftParen);
 
         let name = lhs.as_identifier();
 
-        let expr = Expression::Call(name);
+        let expr = Expression::Call(name, arguments);
 
         Ok(expr)
     }

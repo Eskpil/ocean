@@ -18,6 +18,7 @@ impl NasmBackend {
     
         write!(file, "BITS 64\n");
         write!(file, "extern gpa_allocate_sized\n");
+        write!(file, "extern printf\n");
         write!(file, "segment .text\n");
         write!(file, "    global main\n");
         write!(file, "    main:\n");
@@ -186,7 +187,9 @@ impl NasmBackend {
                 }
                 OpKind::Call => {
                     let symbol = op.operands()[0].as_symbol();
+                    write!(self.output, "    pop rdi\n");
                     write!(self.output, "    call {}\n", symbol);
+                    write!(self.output, "    push rax\n");
                 }
                 OpKind::Jump => {
                     let symbol = op.operands()[0].as_symbol();
@@ -219,7 +222,11 @@ impl NasmBackend {
 
         write!(self.output, "segment .data\n");
         for value in data {
-            write!(self.output, "    {}: db \"{}\"\n", value.0, value.1); 
+            write!(self.output, "    {}: db ", value.0); 
+            for byte in value.1.as_bytes() {
+                write!(self.output, "{}, ", byte);
+            }
+            write!(self.output, "\n");
         }
         write!(self.output, "segment .bss\n");
         for value in bss {

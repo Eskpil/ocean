@@ -5,6 +5,7 @@ mod parser;
 mod backend;
 mod errors;
 mod util;
+mod unescape;
 
 use ast::statements::Statement;
 use errors::syntax::SyntaxError;
