@@ -14,16 +14,12 @@ pub enum TokenKind {
     Assignment,
     Let,
 
-    Do,
-    End,
-
+    Function,
     Struct,
-    Has,
     Colon,
 
     If,
     Else,
-    Then,
 
     Add,
     Sub,
@@ -49,8 +45,12 @@ pub enum TokenKind {
 
     LeftParen,
     RightParen,
+
     LeftBracket,
     RightBracket,
+
+    LeftCurly,
+    RightCurly,
 
     Eof,
 }
@@ -88,14 +88,9 @@ impl TokenKind {
 
             TokenKind::Assignment => "assignment".into(),
             TokenKind::Let => "let".into(),
-
-            TokenKind::Do => "do".into(),
-            TokenKind::End => "end".into(),
-            TokenKind::Then => "then".into(),
-
+            TokenKind::Function => "fn".into(),
             TokenKind::Struct => "struct".into(),
-            TokenKind::Has => "has".into(),
-            TokenKind::Colon => ".".into(),
+            TokenKind::Colon => ":".into(),
 
             TokenKind::If => "if".into(),
             TokenKind::Else => "else".into(),
@@ -124,8 +119,12 @@ impl TokenKind {
 
             TokenKind::RightParen => ")".into(),
             TokenKind::LeftParen => "(".into(),
+
             TokenKind::RightBracket => "]".into(),
             TokenKind::LeftBracket => "[".into(),
+
+            TokenKind::RightCurly => "}".into(),
+            TokenKind::LeftCurly => "{".into(),
 
             TokenKind::Eof => "eof".into(),
         }
@@ -173,8 +172,6 @@ impl Lexer {
         let mut keywords = HashMap::new();
 
         keywords.insert("let".into(), TokenKind::Let);
-        keywords.insert("do".into(), TokenKind::Do);
-        keywords.insert("end".into(), TokenKind::End);
         keywords.insert("and".into(), TokenKind::And);
         keywords.insert("or".into(), TokenKind::Or);
         keywords.insert("true".into(), TokenKind::True);
@@ -182,10 +179,9 @@ impl Lexer {
         keywords.insert("while".into(), TokenKind::While);
         keywords.insert("if".into(), TokenKind::If);
         keywords.insert("else".into(), TokenKind::Else);
-        keywords.insert("then".into(), TokenKind::Then);
         keywords.insert("struct".into(), TokenKind::Struct);
-        keywords.insert("has".into(), TokenKind::Has);
         keywords.insert("bool".into(), TokenKind::Bool);
+        keywords.insert("fn".into(), TokenKind::Function);
 
         Self {
             source: source.into(),
@@ -359,6 +355,16 @@ impl Iterator for Lexer {
             }
             '[' => {
                 let token = Token::kind_loc(TokenKind::LeftBracket, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '}' => {
+                let token = Token::kind_loc(TokenKind::RightCurly, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '{' => {
+                let token = Token::kind_loc(TokenKind::LeftCurly, self.row, self.col);
                 self.advance();
                 Some(token)
             }

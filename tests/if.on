@@ -1,9 +1,9 @@
-Program do
-    if true then
+fn program() {
+    if true {
         let happy = true;
-    else
+    } else {
         let happy = false;
-    end;
-    let a = 1 + 2;
-end
+    };
 
+    let a = 1 + 2;
+}

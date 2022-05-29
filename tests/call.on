@@ -1,10 +1,10 @@
-Hello do
+fn hello() {
     1 + 2 
-end
+}
 
-Program do
-  hello()
-  let a = hello()
-end
+fn program() {
+  hello();
+  let a = hello();
+}
 
 

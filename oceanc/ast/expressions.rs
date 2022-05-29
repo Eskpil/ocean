@@ -7,16 +7,36 @@ use crate::ir::{
 use std::process;
 
 #[derive(Debug, Clone)]
+pub struct NamedArgument {
+    pub name: String,
+    pub value: Expression,
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
     Empty,
     Literal(u64),
-    StructInit(String, Vec<Expression>),
+    StructInit(String, Vec<NamedArgument>),
     Bool(bool),
     StringLiteral(String),
     Identifier(String),
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
     Unary(BinaryOp, Box<Expression>),
-    Call(String, Vec<Expression>),
+    Call(String, Vec<NamedArgument>),
+}
+
+impl NamedArgument {
+    pub fn new(name: String, expr: Expression) -> Self {
+        Self {
+            name,
+            value: expr,
+        }
+    }
+
+    pub fn print(&self, indent: usize) {
+        util::print_indent(indent, format!("Name: {}", self.name)); 
+        self.value.print(indent);
+    }
 }
 
 impl Expression {
@@ -130,7 +150,7 @@ impl Expression {
             }
             Expression::Call(name, arguments) => {
                 for arg in arguments.iter() {
-                    arg.generate(generator);
+                    arg.value.generate(generator);
                 }
 
                 let op = Op::double(

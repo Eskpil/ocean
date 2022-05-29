@@ -1,6 +1,6 @@
-Program do
+fn program() {
   let test = true;
   let a = 2;
   let b = 2;
   let c = a + b;
-end 
+}

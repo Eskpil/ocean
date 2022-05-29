@@ -1,6 +1,6 @@
-Program do
-  let a = 1 + 2 * "Hello";
+fn program() {
+  let a = 1 + 2 * 5;
   let b = 8 / 2;
   a + b;
-end
+}
 

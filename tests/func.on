@@ -1,9 +1,9 @@
-Person do 
+fn person() { 
     let a = 1 + 2;
     let b = 2 + 3;
     let c = a + b;
-end
+}
 
-Program do
-  Person();
-end
+fn program() {
+    person();
+}

@@ -4,5 +4,5 @@ struct Person {
 }
 
 fn program() { 
-    let person = Person[name: "John", arg: 12];
+    let person = Person[name: "John", age: 12];
 }

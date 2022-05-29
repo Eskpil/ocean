@@ -1,9 +1,9 @@
-Program do
-  let a = 2;
-  do
-    let b = 3;
-    do
-      let c = a + b;
-    end
-  end
-end
+fn program() { 
+    let a = 2 + 2;
+    {
+        let b = 3;
+        {
+            let c = a + b;
+        };
+    };
+}

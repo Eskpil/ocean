@@ -1,8 +1,12 @@
 use crate::ast::{
     BinaryOp, 
-    expressions::{Expression}, 
+    expressions::{
+        Expression,
+        NamedArgument,
+    }, 
     statements::{Statement}, 
-    definitions::{StructDefinition, 
+    definitions::{
+        StructDefinition, 
         Definition, 
         FieldDefinition, 
         DefinedType
@@ -58,11 +62,6 @@ impl Operator for TokenKind {
     fn postfix_binding_power(&self) -> Option<(u8, ())> {
         None
     }
-}
-
-pub fn ending_token_kind_for(kind: TokenKind) -> TokenKind {
-    if kind == TokenKind::Then { return TokenKind::Else; }
-    return TokenKind::End;
 }
 
 impl Parser {
@@ -191,13 +190,11 @@ impl Parser {
 
                 TokenKind::RightParen
                 | TokenKind::Let
-                | TokenKind::End
-                | TokenKind::Else
                 | TokenKind::Comma
                 | TokenKind::RightBracket
-                | TokenKind::Then
+                | TokenKind::RightCurly
+                | TokenKind::LeftCurly
                 | TokenKind::Semicolon
-                | TokenKind::Do 
                 | TokenKind::Eof => break,
 
                 _ => {
@@ -246,10 +243,15 @@ impl Parser {
 
     pub fn parse_struct_init(&mut self, lhs: Expression) -> ParseResult<Expression> {
         self.consume(TokenKind::LeftBracket)?;
-        let mut arguments = Vec::<Expression>::new();
+        let mut arguments = Vec::<NamedArgument>::new();
         while !self.at(TokenKind::RightBracket) {
+            let name = self.consume_next(TokenKind::Identifier)?.value.clone();
+            self.consume(TokenKind::Colon)?;
+
             let expr = self.parse_expression(0, None)?; 
-            arguments.push(expr);
+            let argument = NamedArgument::new(name, expr);
+
+            arguments.push(argument);
             
             if !self.at(TokenKind::Comma) {
                 break;
@@ -264,10 +266,15 @@ impl Parser {
 
     pub fn parse_function_call(&mut self, lhs: Expression) -> ParseResult<Expression> {
         self.consume(TokenKind::RightParen); 
-        let mut arguments = Vec::<Expression>::new();
+        let mut arguments = Vec::<NamedArgument>::new();
         while !self.at(TokenKind::RightParen) {
-            let expr = self.parse_expression(0, None)?;
-            arguments.push(expr);
+            let name = self.consume_next(TokenKind::Identifier)?.value.clone();
+            self.consume(TokenKind::Colon)?;
+
+            let expr = self.parse_expression(0, None)?; 
+            let argument = NamedArgument::new(name, expr);
+
+            arguments.push(argument);
 
             if !self.at(TokenKind::Comma) {
                 break;
@@ -284,18 +291,19 @@ impl Parser {
         Ok(expr)
     }
 
-    pub fn parse_block_body(&mut self, should_consume: bool) -> ParseResult<Vec<Statement>> {
-        if self.peek() == TokenKind::Then {
-            self.consume(TokenKind::Then)?;
-        } else if self.peek() == TokenKind::Else {
-            self.consume(TokenKind::Else)?;
-        } else {
-            self.consume(TokenKind::Do)?;
-        }
+    pub fn parse_block_body(&mut self) -> ParseResult<Vec<Statement>> {
+        self.consume(TokenKind::LeftCurly);
         let mut body = Vec::<Statement>::new();
 
-        while !self.multi_at(&[TokenKind::End, TokenKind::Else]) {
-            if self.multi_at(&[TokenKind::Identifier, TokenKind::If, TokenKind::Let, TokenKind::Do, TokenKind::While]) {
+        while !self.at(TokenKind::RightCurly) {
+            if self.multi_at(&[
+                TokenKind::Identifier, 
+                TokenKind::If, 
+                TokenKind::Let, 
+                TokenKind::Function, 
+                TokenKind::While,
+                TokenKind::LeftCurly,
+            ]) {
                 body.push(self.parse_statement()?);  
             } else {
                 let expr = self.parse_expression(0, None)?;
@@ -310,15 +318,13 @@ impl Parser {
             self.consume(TokenKind::Semicolon)?;
         }
 
-        if should_consume == true {
-            self.consume(TokenKind::End)?;
-        } 
+        self.consume(TokenKind::RightCurly)?;
 
         Ok(body)
     }
     
-    pub fn parse_block(&mut self, should_consume: bool) -> ParseResult<Statement> {
-        let body = self.parse_block_body(should_consume)?;    
+    pub fn parse_block(&mut self) -> ParseResult<Statement> {
+        let body = self.parse_block_body()?;    
         let stmt = Statement::Block(body);
 
         Ok(stmt)
@@ -329,11 +335,6 @@ impl Parser {
         let ident = Expression::Identifier(ident_value.clone());
 
         let stmt = match self.peek() {
-            TokenKind::Do => {
-                let block = self.parse_block_body(true)?;         
-                let stmt = Statement::Function(ident_value, block);
-                stmt
-            } 
             TokenKind::LeftParen => {
                 let expr = self.parse_function_call(ident)?;
                 let stmt = Statement::Expression(expr);
@@ -365,11 +366,12 @@ impl Parser {
     pub fn parse_if_statement(&mut self) -> ParseResult<Statement> {
         self.consume(TokenKind::If)?; 
         let cond = self.parse_expression(0, None)?;
-        let if_block = self.parse_block_body(false)?;
+        let if_block = self.parse_block_body()?;
         let mut else_block: Option<Vec<Statement>> = None;
 
         if self.peek() == TokenKind::Else {
-            let block = self.parse_block_body(true)?;
+            self.consume(TokenKind::Else)?;
+            let block = self.parse_block_body()?;
             else_block = Some(block);
         }
 
@@ -383,7 +385,7 @@ impl Parser {
         
         let expr = self.parse_expression(0, None)?;
         
-        let body = self.parse_block_body(true)?;
+        let body = self.parse_block_body()?;
         
         let stmt = Statement::While(expr, body);
 
@@ -394,9 +396,9 @@ impl Parser {
         self.consume(TokenKind::Struct)?;
         let struct_name = self.consume_next(TokenKind::Identifier)?.value.clone();
         let mut fields = Vec::<FieldDefinition>::new();
-        self.consume(TokenKind::Has)?;
+        self.consume(TokenKind::LeftCurly)?;
 
-        while !self.at(TokenKind::End) {
+        while !self.at(TokenKind::RightCurly) {
             let field_name = self.consume_next(TokenKind::Identifier)?.value.clone();  
             self.consume(TokenKind::Colon);
             let field_type = self.consume_next(TokenKind::Identifier)?.value.clone();
@@ -406,7 +408,7 @@ impl Parser {
             fields.push(field);
         }
 
-        self.consume(TokenKind::End)?;
+        self.consume(TokenKind::RightCurly)?;
 
         let struct_definition = StructDefinition::new(struct_name, fields);
         let definition = Definition::Struct(struct_definition);
@@ -415,12 +417,30 @@ impl Parser {
         Ok(stmt)
     }
 
+    pub fn parse_function(&mut self) -> ParseResult<Statement> {
+        self.consume(TokenKind::Function)?; 
+        let name = self.consume_next(TokenKind::Identifier)?.value.clone();
+        self.consume(TokenKind::LeftParen)?;
+        self.consume(TokenKind::RightParen)?;
+
+        if self.peek() == TokenKind::Semicolon {
+            self.consume(TokenKind::Semicolon)?;   
+            let function = Statement::Function(name, vec![]);
+            Ok(function)
+        } else {
+            let body = self.parse_block_body()?; 
+            let function = Statement::Function(name, body);
+            Ok(function)
+        }
+    }
+
     pub fn parse_statement(&mut self) -> ParseResult<Statement> {
         match self.peek() {
             TokenKind::Identifier => self.parse_ident_begin(),
             TokenKind::Let => self.parse_let_statement(),
-            TokenKind::Do => self.parse_block(true),
+            TokenKind::LeftCurly => self.parse_block(),
             TokenKind::Struct => self.parse_definition(),
+            TokenKind::Function => self.parse_function(),
             TokenKind::If => self.parse_if_statement(),
             TokenKind::While => self.parse_while_loop(),
             TokenKind::Literal => {

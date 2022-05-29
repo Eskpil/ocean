@@ -1,7 +1,9 @@
-Program do 
+fn program() {
   let a = 1 + 2;
-  while true do
 
-  end
+  while true { 
+    let hello = "Hello!";
+  };
+
   let b = a + 2;
-end
+}
