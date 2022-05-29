@@ -8,6 +8,8 @@ pub enum OpKind {
     Call,
 
     NewString,
+    ResolveString,
+
     NewStruct,
 
     ResolveVariable,

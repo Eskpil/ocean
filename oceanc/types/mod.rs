@@ -20,6 +20,7 @@ pub type ExpressionResult = Result<CheckedExpression, TypeError>;
 pub struct CheckedNamedArgument {
     pub name: String,
     pub type_id: TypeId,
+    pub expr: CheckedExpression,
 }
 
 #[derive(Debug, Clone)]
@@ -73,11 +74,18 @@ pub struct CheckedVariable {
 }
 
 #[derive(Debug, Clone)]
+pub struct CheckedVariableDecl {
+    pub name: String,    
+    pub type_id: TypeId,
+    pub expr: CheckedExpression,
+}
+
+#[derive(Debug, Clone)]
 pub enum CheckedExpression {
-    Literal,
+    Literal(u64),
     Empty,
-    StringLiteral,
-    Identifier(String),
+    StringLiteral(String),
+    Identifier(String, TypeId),
     Binary(CheckedBinaryExpression),    
     Call(CheckedFunctionCall),
 }
@@ -92,7 +100,7 @@ pub enum CheckedStatement {
     Define,
     Function(CheckedFunction), 
     Expression(CheckedExpression),
-    Variable(CheckedVariable),
+    VariableDecl(CheckedVariableDecl),
     Block(CheckedBlock),
 }
 
@@ -106,10 +114,15 @@ impl CheckedFunctionCall {
 }
 
 impl CheckedNamedArgument {
-    pub fn new(name: String, type_id: TypeId) -> Self {
+    pub fn new(
+        name: String, 
+        type_id: TypeId, 
+        expr: CheckedExpression
+    ) -> Self {
         Self {
             name,
             type_id,
+            expr,
         }
     }
 }
@@ -138,10 +151,27 @@ impl CheckedBinaryExpression {
 }
 
 impl CheckedVariable {
-    pub fn new(name: String, type_id: TypeId) -> Self {
+    pub fn new(
+        name: String, 
+        type_id: TypeId, 
+    ) -> Self {
         Self {
             name,
             type_id,
+        }
+    }    
+}
+
+impl CheckedVariableDecl {
+    pub fn new(
+        name: String, 
+        type_id: TypeId, 
+        expr: CheckedExpression,
+    ) -> Self {
+        Self {
+            name,
+            type_id,
+            expr,
         }
     }    
 }

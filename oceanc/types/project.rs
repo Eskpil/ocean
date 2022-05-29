@@ -17,6 +17,7 @@ use super::{
     CheckedNamedParameter,
     CheckedNamedArgument,
     CheckedFunctionCall,
+    CheckedVariableDecl,
 
     BOOL_TYPE_ID,
     STRING_TYPE_ID,
@@ -180,8 +181,8 @@ impl Project {
                 CheckedStatement::Function(function)
             }
             Statement::Declaration(name, expr) => {
-                let variable = self.typecheck_variable(name.clone(), expr, scope_id)?;
-                CheckedStatement::Variable(variable)
+                let decl = self.typecheck_variable(name.clone(), expr, scope_id)?;
+                CheckedStatement::VariableDecl(decl)
             }
             Statement::Block(body) => {
                 let block = self.typecheck_block(body.clone(), scope_id)?;
@@ -203,12 +204,9 @@ impl Project {
         scope_id: ScopeId,
     ) -> Result<TypeId, TypeError> {
         match expr {
-            CheckedExpression::Literal => self.lookup_type("Int".to_string()),
-            CheckedExpression::StringLiteral => self.lookup_type("String".to_string()),
-            CheckedExpression::Identifier(name) => {
-                let variable = self.find_variable(name.to_string(), scope_id)?; 
-                Ok(variable.type_id)
-            }
+            CheckedExpression::Literal(_) => self.lookup_type("Int".to_string()),
+            CheckedExpression::StringLiteral(_) => self.lookup_type("String".to_string()),
+            CheckedExpression::Identifier(_, id) => Ok(*id),
             CheckedExpression::Binary(_) => self.lookup_type("Int".to_string()),
             o => todo!("Get TypeId from {:?}", o),
         }  
@@ -249,9 +247,13 @@ impl Project {
         scope_id: ScopeId,
     ) -> ExpressionResult {
         let expr = match expression {
-            Expression::Literal(v) => CheckedExpression::Literal,   
-            Expression::StringLiteral(_) => CheckedExpression::StringLiteral,
-            Expression::Identifier(name) => CheckedExpression::Identifier(name.to_string()),
+            Expression::Literal(v) => CheckedExpression::Literal(v.clone()),   
+            Expression::StringLiteral(v) => CheckedExpression::StringLiteral(v.to_string()),
+            Expression::Identifier(name) => {
+                let variable = self.find_variable(name.to_string(), scope_id)?;
+                let type_id = variable.type_id;
+                CheckedExpression::Identifier(name.to_string(), type_id) 
+            }
             Expression::Call(name, arguments) => {
                 let call = self.typecheck_function_call(
                     name.to_string(), 
@@ -279,7 +281,7 @@ impl Project {
         let name = argument.name.clone(); 
         let checked_expr = self.typecheck_expression(&argument.value, scope_id)?;
         let type_id = self.get_expression_type_id(&checked_expr, scope_id)?;
-        Ok(CheckedNamedArgument::new(name, type_id))
+        Ok(CheckedNamedArgument::new(name, type_id, checked_expr))
     }
 
     pub fn typecheck_function_call(
@@ -343,12 +345,24 @@ impl Project {
         name: String,
         expression: &Expression,
         scope_id: ScopeId,
-    ) -> Result<CheckedVariable, TypeError> {
+    ) -> Result<CheckedVariableDecl, TypeError> {
         let checked_expression = self.typecheck_expression(expression, scope_id)?;
         let type_id = self.get_expression_type_id(&checked_expression, scope_id)?;
-        let checked_variable = CheckedVariable::new(name.clone(), type_id);
+
+        // Used for IR generation.
+        let checked_variable_decl = CheckedVariableDecl::new(
+            name.clone(), 
+            type_id, 
+            checked_expression
+        );
+
+        let checked_variable = CheckedVariable::new(
+            name.clone(),
+            type_id,
+        );
+
         self.add_variable_to_scope(checked_variable.clone(), scope_id);
-        Ok(checked_variable)
+        Ok(checked_variable_decl)
     }
 
     pub fn typecheck_block(

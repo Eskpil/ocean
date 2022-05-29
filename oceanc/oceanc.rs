@@ -11,6 +11,7 @@ mod types;
 use ast::statements::Statement;
 use errors::syntax::SyntaxError;
 use ir::generator::Generator;
+use ir::project::generate_project;
 use backend::nasm::{NasmBackend};
 use types::project::Project;
 use std::env;
@@ -50,8 +51,6 @@ fn main() {
 
     let mut generator = Generator::new();
 
-    program.print(0);
-
     let mut project = Project::new(); 
 
     match project.typecheck_program(&program) {
@@ -62,15 +61,11 @@ fn main() {
         }
     }
 
-    program.generate(&mut generator);
+    generate_project(&project, &mut generator);
+
+    // program.generate(&mut generator);
 
     let ops = generator.eject();
-
-    println!("Ops:");
-
-    for op in ops.iter() {
-        println!("  {:?}", op); 
-    }
 
     let mut backend = NasmBackend::new("test.asm".to_string());
     backend.generate_ops(ops);
@@ -83,5 +78,5 @@ fn main() {
     let runtime_link = format!("{pwd}/bld/runtime/runtime.so");
 
     util::run_cmd_echoed("nasm -felf64 test.asm".to_string());
-    util::run_cmd_echoed(format!("gcc -no-pie -o test {runtime_link} ./test.o"));
+    util::run_cmd_echoed(format!("clang -no-pie -o test {runtime_link} ./test.o"));
 }
