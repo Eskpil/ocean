@@ -1,7 +1,16 @@
 use super::expressions::{Expression};
-use super::definitions::{Definition};
+use super::definitions::{Definition, DefinedType};
 use super::util;
-use crate::ir::{op::{Op, OpKind, Operand}, generator::{Generator}};
+use crate::ir::{
+    op::{Op, OpKind, Operand}, 
+    generator::{Generator}
+};
+
+#[derive(Debug, Clone)]
+pub struct NamedParameter {
+    pub name: String,
+    pub defined_type: DefinedType,
+} 
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -9,10 +18,19 @@ pub enum Statement {
     Define(Definition),
     Block(Vec<Statement>),
     If(Expression, Vec<Statement>, Option<Vec<Statement>>),
-    Function(String, Vec<Statement>),
+    Function(String, Vec<NamedParameter>, Vec<Statement>),
     Expression(Expression),
     While(Expression, Vec<Statement>),
     Declaration(String, Expression),
+}
+
+impl NamedParameter {
+    pub fn new(name: String, defined_type: DefinedType) -> Self {
+        Self {
+            name,
+            defined_type,
+        }
+    }
 }
 
 impl Statement {
@@ -50,7 +68,7 @@ impl Statement {
                     }
                 }
             }
-            Statement::Function(name, children) => {
+            Statement::Function(name, parameters, children) => {
                 util::print_indent(indent, "FunctionStatement:".into());
                 util::print_indent(indent + 1, "Name:".into());
                 util::print_indent(indent + 2, name);
@@ -129,7 +147,7 @@ impl Statement {
 
                 generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
             }
-            Statement::Function(name, children) => {
+            Statement::Function(name, parameters, children) => {
                 let op = Op::single(OpKind::Proc, Operand::Symbol(name.clone().to_lowercase()));
 
                 generator.append(op);

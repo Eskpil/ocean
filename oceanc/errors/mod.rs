@@ -6,4 +6,5 @@ pub enum TypeError {
     MismatchedTypes(String, String),
     VariableNotInScope(String),
     FunctionNotInScope(String),
+    DuplicateFunctionParameter(String),
 }

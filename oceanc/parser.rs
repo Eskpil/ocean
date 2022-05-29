@@ -4,7 +4,10 @@ use crate::ast::{
         Expression,
         NamedArgument,
     }, 
-    statements::{Statement}, 
+    statements::{
+        Statement,
+        NamedParameter,
+    }, 
     definitions::{
         StructDefinition, 
         Definition, 
@@ -417,19 +420,47 @@ impl Parser {
         Ok(stmt)
     }
 
+    pub fn parse_defined_type(&mut self) -> ParseResult<DefinedType> {
+        match self.peek() {
+            TokenKind::Identifier => {
+                let name = self.consume_next(TokenKind::Identifier)?.value.clone();         
+                Ok(DefinedType::Name(name))
+            }   
+            o => todo!("Parse defined type for: {:?}", o)
+        } 
+    }
+
     pub fn parse_function(&mut self) -> ParseResult<Statement> {
         self.consume(TokenKind::Function)?; 
         let name = self.consume_next(TokenKind::Identifier)?.value.clone();
+        let mut parameters = Vec::<NamedParameter>::new();
         self.consume(TokenKind::LeftParen)?;
+
+        while !self.at(TokenKind::RightParen) {
+            let name = self.consume_next(TokenKind::Identifier)?.value.clone();
+            self.consume(TokenKind::Colon)?;
+
+            let defined_type = self.parse_defined_type()?; 
+            let parameter = NamedParameter::new(name, defined_type);
+
+            parameters.push(parameter);
+
+            if !self.at(TokenKind::Comma) {
+                break;
+            } else {
+                self.consume(TokenKind::Comma)?;
+            }
+        }
+
         self.consume(TokenKind::RightParen)?;
 
         if self.peek() == TokenKind::Semicolon {
             self.consume(TokenKind::Semicolon)?;   
-            let function = Statement::Function(name, vec![]);
+            let function = Statement::Function(name, parameters, vec![]);
             Ok(function)
         } else {
             let body = self.parse_block_body()?; 
-            let function = Statement::Function(name, body);
+            let function = Statement::Function(name, parameters, body);
             Ok(function)
         }
     }

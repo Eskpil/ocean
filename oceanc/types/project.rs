@@ -14,6 +14,7 @@ use super::{
     CheckedStatement,
     CheckedExpression,
     CheckedBinaryExpression,
+    CheckedNamedParameter,
 
     BOOL_TYPE_ID,
     STRING_TYPE_ID,
@@ -28,7 +29,10 @@ use crate::ast::{
         StructDefinition,
         FieldDefinition,
     },
-    statements::{Statement},
+    statements::{
+        Statement,
+        NamedParameter,
+    },
     expressions::{Expression},
 };
 use crate::errors::TypeError;
@@ -150,8 +154,13 @@ impl Project {
 
                 CheckedStatement::Define
             },
-            Statement::Function(name, children) => {
-                let function = self.typecheck_function(name.clone(), children.clone(), scope_id)?;
+            Statement::Function(name, parameters, children) => {
+                let function = self.typecheck_function(
+                    name.clone(), 
+                    parameters.clone(), 
+                    children.clone(), 
+                    scope_id
+                )?;
                 self.functions.push(function.clone());
                 CheckedStatement::Function(function)
             }
@@ -267,16 +276,54 @@ impl Project {
         Ok(checked_block)     
     }
 
+    pub fn typecheck_named_parameter(
+        &mut self,
+        parameter: &NamedParameter,
+        scope_id: ScopeId,
+    ) -> Result<CheckedNamedParameter, TypeError> {
+        let name = parameter.name.clone(); 
+        let type_id = self.lookup_type(parameter.defined_type.to_name())?;
+        Ok(CheckedNamedParameter::new(name, type_id))
+    }
+
     pub fn typecheck_function(
         &mut self, 
         name: String, 
+        parameters: Vec<NamedParameter>,
         children: Vec<Statement>,
         scope_id: ScopeId,
     ) -> Result<CheckedFunction, TypeError> {
-        let mut checked_function = CheckedFunction::new(name.clone(), None);
+        let mut checked_parameters = Vec::<CheckedNamedParameter>::new();
+
+        for parameter in parameters.iter() {
+            match checked_parameters.iter().find(
+                |&x| x.name == parameter.name.clone()
+            ) {
+                Some(checked) => {
+                    return Err(TypeError::DuplicateFunctionParameter(parameter.name.clone()));
+                }
+                None => {
+                    let checked_parameter = self.typecheck_named_parameter(
+                        parameter, 
+                        scope_id
+                    )?;
+                    checked_parameters.push(checked_parameter);        
+                }
+            }
+        }
+
+        let mut checked_function = CheckedFunction::new(
+            name.clone(), 
+            checked_parameters.clone(),
+            None
+        );
         if children.len() > 0 {
             let checked_block = self.typecheck_block(children, scope_id)?;
-            checked_function = CheckedFunction::new(name.clone(), Some(checked_block));
+            checked_function = CheckedFunction::new(
+                name.clone(), 
+                checked_parameters.clone(),
+                Some(checked_block)
+            );
         }
 
         self.add_function_to_scope(checked_function.clone(), scope_id);

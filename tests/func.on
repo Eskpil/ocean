@@ -1,7 +1,7 @@
-fn person() { 
-    let a = 1 + 2;
-    let b = 2 + 3;
-    let c = a + b;
+fn person(name: String, age: Int) { 
+    printf(message: "Name: ");
+    printf(message: name);
+    printf(message: "\n");
 }
 
 fn program() {
