@@ -6,11 +6,13 @@ mod backend;
 mod errors;
 mod util;
 mod unescape;
+mod types;
 
 use ast::statements::Statement;
 use errors::syntax::SyntaxError;
 use ir::generator::Generator;
 use backend::nasm::{NasmBackend};
+use types::project::Project;
 use std::env;
 use std::process;
 
@@ -49,6 +51,17 @@ fn main() {
     let mut generator = Generator::new();
 
     program.print(0);
+
+    let mut project = Project::new(); 
+
+    match project.typecheck_program(&program) {
+        Ok(_) => println!("Typechecked."),
+        Err(err) => {
+            eprintln!("Typechecking return error: {:?}", err);
+            process::exit(1);
+        }
+    }
+
     program.generate(&mut generator);
 
     let ops = generator.eject();

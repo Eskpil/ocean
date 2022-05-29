@@ -44,6 +44,15 @@ impl Definition {
     }
 }
 
+impl DefinedType {
+    pub fn to_name(&self) -> String {
+        match self {
+            DefinedType::Name(n) => n.clone(),   
+            o => unreachable!("Expected DefinedType::Name() but found DefinedType::{:?}", o),
+        }
+    }
+}
+
 impl StructDefinition {
     pub fn new(name: String, fields: Vec<FieldDefinition>) -> Self {
         Self {

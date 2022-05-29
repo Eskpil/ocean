@@ -32,7 +32,7 @@ syntax match oceanEscapes display contained "\\[nr\"']"
 syntax match oceanNumber "\d\+"
 
 " Type names the compiler recognizes
-syntax keyword oceanTypeNames int bool true false
+syntax keyword oceanTypeNames String Int Bool 
 " Set highlights
 highlight default link oceanTodos Todo
 highlight default link oceanKeywords Keyword

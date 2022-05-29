@@ -1,5 +1,5 @@
 Program do
-  let a = 1 + 2 * 5;
+  let a = 1 + 2 * "Hello";
   let b = 8 / 2;
   a + b;
 end
