@@ -1,5 +1,5 @@
 fn printf(message: String);
 
 fn program() { 
-    printf(message: "Hello, World!\n");
+    printf(message: "Hello, World\n");
 }

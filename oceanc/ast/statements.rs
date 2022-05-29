@@ -149,9 +149,23 @@ impl Statement {
             }
             Statement::Function(name, parameters, children) => {
                 if children.len() > 0 {
-                    let op = Op::single(OpKind::Proc, Operand::Symbol(name.clone().to_lowercase()));
+                    let op = Op::double(
+                        OpKind::Proc, 
+                        Operand::Symbol(name.clone().to_lowercase()), 
+                        Operand::Uint(parameters.len() as u64)
+                    );
 
                     generator.append(op);
+
+                    for param in parameters.iter() {
+                        let op = Op::single(
+                            OpKind::NewVariable, 
+                            Operand::Symbol(param.name.clone())
+                        );       
+
+                        generator.append(op);
+                    }
+
             
                     for child in children.iter() {
                         child.generate(generator);

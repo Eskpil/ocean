@@ -10,11 +10,22 @@ pub struct NasmBackend {
     scopes: Vec<BackendScope>,    
     current: BackendScope,
     output: File,
+
+    convention: HashMap<u64, String>,
 }
 
 impl NasmBackend {
     pub fn new(output_path: String) -> Self {
         let mut file = File::create(output_path).unwrap(); 
+        let mut convention = HashMap::<u64, String>::new();
+
+        // TODO: Implement the right-left stack convention.
+        convention.insert(0, "rdi".into());
+        convention.insert(1, "rsi".into());
+        convention.insert(2, "rdx".into());
+        convention.insert(3, "rcx".into());
+        convention.insert(4, "r8".into());
+        convention.insert(5, "r9".into());
     
         write!(file, "BITS 64\n");
         write!(file, "extern gpa_allocate_sized\n");
@@ -33,6 +44,7 @@ impl NasmBackend {
         Self {
             scopes: vec![],
             output: file,
+            convention,
             current: BackendScope::new("main".to_string()),
         }
     }    
@@ -53,10 +65,17 @@ impl NasmBackend {
                 } 
                 OpKind::Proc => {
                     let symbol = op.operands()[0].as_symbol();
+                    let parameters_size = op.operands()[1].as_uint();
                     self.new_scope(symbol.clone());
                     write!(self.output, "    {}:\n", symbol);
                     write!(self.output, "    push rbp\n");
                     write!(self.output, "    mov rbp, rsp\n");
+
+                    for i in 0..parameters_size {
+                        let reg = self.convention.get(&i).unwrap();
+                        write!(self.output, "    push {}\n", reg);
+                        self.current.gc_count += 1;
+                    }
                 }
                 OpKind::End => {
                     // Clear our stack garbage.
@@ -187,7 +206,14 @@ impl NasmBackend {
                 }
                 OpKind::Call => {
                     let symbol = op.operands()[0].as_symbol();
-                    write!(self.output, "    pop rdi\n");
+                    let arguments_size = op.operands()[1].as_uint();
+
+                    for i in 0..arguments_size {
+                        let reg = self.convention.get(&i).unwrap();
+                        write!(self.output, "    pop {}\n", reg);
+                        self.current.gc_count -= 1;
+                    }
+
                     write!(self.output, "    call {}\n", symbol);
                     write!(self.output, "    push rax\n");
                 }
