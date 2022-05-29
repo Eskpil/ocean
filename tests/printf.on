@@ -1,5 +1,6 @@
 fn printf(message: String);
 
 fn program() { 
-    printf(message: "Hello, World\n");
+    let message = "Hello, World\n";
+    printf(message: message);
 }

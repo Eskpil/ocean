@@ -113,12 +113,12 @@ impl NasmBackend {
                             self.current.gc_count -= 1;                           
                         }
                         BinaryOp::Div => {
-                            write!(self.output, "   pop rax\n"); // What we are dividing by.
-                            write!(self.output, "   pop rbx\n"); // What we are dividing.
-                            write!(self.output, "   mov rbx, rdx\n");
-                            write!(self.output, "   cqo\n");
-                            write!(self.output, "   div rax\n");
-                            write!(self.output, "   push rbx\n");
+                            write!(self.output, "    pop rax\n"); // What we are dividing by.
+                            write!(self.output, "    pop rbx\n"); // What we are dividing.
+                            write!(self.output, "    mov rbx, rdx\n");
+                            write!(self.output, "    cqo\n");
+                            write!(self.output, "    div rax\n");
+                            write!(self.output, "    push rbx\n");
                             // 2 - 1 = 1. We have taken one element of the stack.
                             self.current.gc_count -= 1;                           
                         }
@@ -197,6 +197,11 @@ impl NasmBackend {
                     write!(self.output, "    push rax\n");
                     self.current.gc_count += 1;
                 }
+                OpKind::ResolveString => {
+                    write!(self.output, "    pop rax\n");             
+                    write!(self.output, "    mov rdi, [rax]\n");
+                    write!(self.output, "    push rdi\n");
+                }
                 OpKind::NewStruct => {
                     let size = op.operands()[0].as_uint();
                     write!(self.output, "    mov rdi, {}\n", size);
@@ -216,6 +221,8 @@ impl NasmBackend {
 
                     write!(self.output, "    call {}\n", symbol);
                     write!(self.output, "    push rax\n");
+
+                    self.current.gc_count += 1;
                 }
                 OpKind::Jump => {
                     let symbol = op.operands()[0].as_symbol();
