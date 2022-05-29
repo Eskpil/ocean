@@ -155,7 +155,7 @@ impl Expression {
 
                 let op = Op::double(
                     OpKind::Call, 
-                    Operand::Symbol(name.clone().to_lowercase()), 
+                    Operand::Symbol(name.clone()), 
                     Operand::Uint(arguments.len() as u64)
                 );
                 generator.append(op);

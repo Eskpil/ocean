@@ -15,6 +15,7 @@ pub type DefinitionResult = Result<CheckedDefinition, TypeError>;
 pub type StatementResult = Result<CheckedStatement, TypeError>;
 pub type ExpressionResult = Result<CheckedExpression, TypeError>;
 
+
 #[derive(Debug, Clone)]
 pub struct CheckedNamedArgument {
     pub name: String,
@@ -31,6 +32,12 @@ pub struct CheckedNamedParameter {
 pub struct CheckedField {
     pub name: String,
     pub type_id: TypeId,
+}
+
+#[derive(Debug, Clone)]
+pub struct CheckedFunctionCall {
+    pub name: String,
+    pub arguments: Vec<CheckedNamedArgument>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +79,7 @@ pub enum CheckedExpression {
     StringLiteral,
     Identifier(String),
     Binary(CheckedBinaryExpression),    
+    Call(CheckedFunctionCall),
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +94,24 @@ pub enum CheckedStatement {
     Expression(CheckedExpression),
     Variable(CheckedVariable),
     Block(CheckedBlock),
+}
+
+impl CheckedFunctionCall {
+    pub fn new(name: String, arguments: Vec<CheckedNamedArgument>) -> Self {
+        Self {
+            name,
+            arguments,
+        }
+    }
+}
+
+impl CheckedNamedArgument {
+    pub fn new(name: String, type_id: TypeId) -> Self {
+        Self {
+            name,
+            type_id,
+        }
+    }
 }
 
 impl CheckedNamedParameter {

@@ -148,15 +148,17 @@ impl Statement {
                 generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
             }
             Statement::Function(name, parameters, children) => {
-                let op = Op::single(OpKind::Proc, Operand::Symbol(name.clone().to_lowercase()));
+                if children.len() > 0 {
+                    let op = Op::single(OpKind::Proc, Operand::Symbol(name.clone().to_lowercase()));
 
-                generator.append(op);
-        
-                for child in children.iter() {
-                    child.generate(generator);
+                    generator.append(op);
+            
+                    for child in children.iter() {
+                        child.generate(generator);
+                    }
+                    
+                    generator.append(Op::none(OpKind::End));
                 }
-                
-                generator.append(Op::none(OpKind::End));
             }
             Statement::Expression(expr) => {
                 expr.generate(generator);

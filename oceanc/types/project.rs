@@ -15,6 +15,8 @@ use super::{
     CheckedExpression,
     CheckedBinaryExpression,
     CheckedNamedParameter,
+    CheckedNamedArgument,
+    CheckedFunctionCall,
 
     BOOL_TYPE_ID,
     STRING_TYPE_ID,
@@ -33,7 +35,10 @@ use crate::ast::{
         Statement,
         NamedParameter,
     },
-    expressions::{Expression},
+    expressions::{
+        Expression,
+        NamedArgument,
+    },
 };
 use crate::errors::TypeError;
 use std::boxed::Box;
@@ -103,6 +108,16 @@ impl Project {
         Ok(var)
     }
 
+    pub fn find_function(
+        &mut self,
+        name: String,
+        scope_id: ScopeId,
+    ) -> Result<CheckedFunction, TypeError> {
+        let scope = &self.scopes[scope_id]; 
+        let function = scope.find_function(name.clone())?;
+        Ok(function)
+    }
+
     pub fn allocate_type(&mut self, name: String) -> TypeId {
         self.types.insert(name, self.types.len());
         self.types.len()
@@ -157,7 +172,7 @@ impl Project {
             Statement::Function(name, parameters, children) => {
                 let function = self.typecheck_function(
                     name.clone(), 
-                    parameters.clone(), 
+                    &parameters, 
                     children.clone(), 
                     scope_id
                 )?;
@@ -237,6 +252,15 @@ impl Project {
             Expression::Literal(v) => CheckedExpression::Literal,   
             Expression::StringLiteral(_) => CheckedExpression::StringLiteral,
             Expression::Identifier(name) => CheckedExpression::Identifier(name.to_string()),
+            Expression::Call(name, arguments) => {
+                let call = self.typecheck_function_call(
+                    name.to_string(), 
+                    arguments.clone(),
+                    scope_id,
+                )?;
+
+                CheckedExpression::Call(call)
+            }
             Expression::Binary(op, lhs, rhs) => {
                 let expr = self.typecheck_binary_expression(&*lhs, &*rhs, op, scope_id)?;
                 CheckedExpression::Binary(expr)
@@ -245,6 +269,73 @@ impl Project {
         };
 
         Ok(expr)
+    }
+    
+    pub fn typecheck_named_argument(
+        &mut self,
+        argument: &NamedArgument,
+        scope_id: ScopeId,
+    ) -> Result<CheckedNamedArgument, TypeError> {
+        let name = argument.name.clone(); 
+        let checked_expr = self.typecheck_expression(&argument.value, scope_id)?;
+        let type_id = self.get_expression_type_id(&checked_expr, scope_id)?;
+        Ok(CheckedNamedArgument::new(name, type_id))
+    }
+
+    pub fn typecheck_function_call(
+        &mut self,
+        name: String,
+        arguments: Vec<NamedArgument>,
+        scope_id: ScopeId,
+    ) -> Result<CheckedFunctionCall, TypeError> {
+        let mut checked_arguments = Vec::<CheckedNamedArgument>::new();
+
+        for argument in arguments.iter() {
+            match checked_arguments.iter().find(
+                |&x| x.name == argument.name.clone()
+            ) {
+                Some(checked) => {
+                    return Err(TypeError::DuplicateFunctionCallArgument(argument.name.clone()));
+                }
+                None => {
+                    let checked_argument = self.typecheck_named_argument(
+                        argument, 
+                        scope_id
+                    )?;
+                    checked_arguments.push(checked_argument);        
+                }
+            } 
+        }
+
+        let function = self.find_function(name.clone(), scope_id)?;  
+        
+        if checked_arguments.len() > function.parameters.len() {
+            return Err(TypeError::ExhaustiveFunctionCallArguments(
+                    function.parameters.len(), 
+                    checked_arguments
+            ));
+        } 
+
+        for argument in checked_arguments.iter() {
+            match function.parameters.iter().find(
+                |&x| x.name == argument.name.clone()
+            ) {
+                Some(param) => {
+                    if param.type_id != argument.type_id {
+                        return Err(TypeError::MismatchedTypes(
+                            self.lookup_type_name(param.type_id).unwrap(),
+                            self.lookup_type_name(argument.type_id).unwrap(),
+                        ))        
+                    } 
+                }  
+                None => {
+                    return Err(TypeError::UnknownFunctionArgument(argument.name.clone())); 
+                }
+            }            
+        }
+
+        let checked_call = CheckedFunctionCall::new(name.clone(), checked_arguments); 
+        Ok(checked_call)
     }
 
     pub fn typecheck_variable(
@@ -276,6 +367,28 @@ impl Project {
         Ok(checked_block)     
     }
 
+    pub fn typecheck_function_block(
+        &mut self, 
+        statements: Vec<Statement>,
+        parameters: &Vec<CheckedNamedParameter>,
+        scope_id: ScopeId,
+    ) -> Result<CheckedBlock, TypeError> {
+        let mut checked_block = CheckedBlock::new();
+        let block_scope_id = self.create_scope(scope_id);
+
+        for param in parameters.iter() {
+            let var = CheckedVariable::new(param.name.clone(), param.type_id);
+            self.add_variable_to_scope(var, block_scope_id);
+        }
+
+        for statement in statements.iter() {
+            let checked_statement = self.typecheck_statement(statement, block_scope_id)?; 
+            checked_block.children.push(checked_statement);
+        } 
+
+        Ok(checked_block)     
+    }
+
     pub fn typecheck_named_parameter(
         &mut self,
         parameter: &NamedParameter,
@@ -289,7 +402,7 @@ impl Project {
     pub fn typecheck_function(
         &mut self, 
         name: String, 
-        parameters: Vec<NamedParameter>,
+        parameters: &Vec<NamedParameter>,
         children: Vec<Statement>,
         scope_id: ScopeId,
     ) -> Result<CheckedFunction, TypeError> {
@@ -318,7 +431,11 @@ impl Project {
             None
         );
         if children.len() > 0 {
-            let checked_block = self.typecheck_block(children, scope_id)?;
+            let checked_block = self.typecheck_function_block(
+                children, 
+                &checked_parameters, 
+                scope_id
+            )?;
             checked_function = CheckedFunction::new(
                 name.clone(), 
                 checked_parameters.clone(),

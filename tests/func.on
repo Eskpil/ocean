@@ -1,3 +1,5 @@
+fn printf(message: String);
+
 fn person(name: String, age: Int) { 
     printf(message: "Name: ");
     printf(message: name);
