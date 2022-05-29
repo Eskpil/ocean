@@ -5,4 +5,5 @@ pub enum TypeError {
     UnknownType(String),
     MismatchedTypes(String, String),
     VariableNotInScope(String),
+    FunctionNotInScope(String),
 }

@@ -69,7 +69,7 @@ impl Project {
     }
 
 
-    pub fn append_variable(
+    pub fn add_variable_to_scope(
         &mut self, 
         variable: CheckedVariable,
         scope_id: ScopeId
@@ -77,6 +77,16 @@ impl Project {
         let scope = &mut self.scopes[scope_id];
 
         scope.append_variable(variable);
+    }
+
+    pub fn add_function_to_scope(
+        &mut self, 
+        function: CheckedFunction,
+        scope_id: ScopeId
+    ) {
+        let scope = &mut self.scopes[scope_id];
+
+        scope.append_function(function);
     }
 
     pub fn find_variable(
@@ -148,6 +158,10 @@ impl Project {
             Statement::Declaration(name, expr) => {
                 let variable = self.typecheck_variable(name.clone(), expr, scope_id)?;
                 CheckedStatement::Variable(variable)
+            }
+            Statement::Block(body) => {
+                let block = self.typecheck_block(body.clone(), scope_id)?;
+                CheckedStatement::Block(block)     
             }
             Statement::Expression(expr) => {
                 let checked_expr = self.typecheck_expression(expr, scope_id)?; 
@@ -233,7 +247,7 @@ impl Project {
         let checked_expression = self.typecheck_expression(expression, scope_id)?;
         let type_id = self.get_expression_type_id(&checked_expression, scope_id)?;
         let checked_variable = CheckedVariable::new(name.clone(), type_id);
-        self.append_variable(checked_variable.clone(), scope_id);
+        self.add_variable_to_scope(checked_variable.clone(), scope_id);
         Ok(checked_variable)
     }
 
@@ -259,8 +273,14 @@ impl Project {
         children: Vec<Statement>,
         scope_id: ScopeId,
     ) -> Result<CheckedFunction, TypeError> {
-        let checked_block = self.typecheck_block(children, scope_id)?;
-        let checked_function = CheckedFunction::new(name.clone(), checked_block);
+        let mut checked_function = CheckedFunction::new(name.clone(), None);
+        if children.len() > 0 {
+            let checked_block = self.typecheck_block(children, scope_id)?;
+            checked_function = CheckedFunction::new(name.clone(), Some(checked_block));
+        }
+
+        self.add_function_to_scope(checked_function.clone(), scope_id);
+    
         Ok(checked_function)          
     }
 

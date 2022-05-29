@@ -43,7 +43,7 @@ pub struct CheckedBlock {
 #[derive(Debug, Clone)]
 pub struct CheckedFunction {
     pub name: String, 
-    pub block: CheckedBlock,
+    pub block: Option<CheckedBlock>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +72,7 @@ pub enum CheckedStatement {
     Function(CheckedFunction), 
     Expression(CheckedExpression),
     Variable(CheckedVariable),
+    Block(CheckedBlock),
 }
 
 impl CheckedBinaryExpression {
@@ -98,7 +99,7 @@ impl CheckedVariable {
 }
 
 impl CheckedFunction {
-    pub fn new(name: String, block: CheckedBlock) -> Self {
+    pub fn new(name: String, block: Option<CheckedBlock>) -> Self {
         Self {
             name,
             block,
