@@ -28,7 +28,6 @@ impl NasmBackend {
         convention.insert(5, "r9".into());
     
         write!(file, "BITS 64\n");
-        write!(file, "extern gpa_allocate_sized\n");
         write!(file, "extern printf\n");
         write!(file, "segment .text\n");
         write!(file, "    global main\n");
@@ -175,17 +174,15 @@ impl NasmBackend {
                     }
                 }
                 OpKind::NewVariable => {
-                    let symbol = op.operands()[0].as_symbol();
-                    let variable = self.current.append_variable(symbol, 8);
+                    let offset = op.operands()[0].as_uint();
                     write!(self.output, "    pop rax\n");
-                    write!(self.output, "    mov [rel {}], rax\n", variable.scoped_name);
+                    write!(self.output, "    mov [rbp-{:x}], rax\n", offset);
                     // We have taken one value of the stack and moved it into a variable.
                     if self.current.gc_count >= 1 { self.current.gc_count -= 1; }
                 }
                 OpKind::ResolveVariable => {
-                    let symbol = op.operands()[0].as_symbol();
-                    let variable = self.current.find_variable(symbol.clone());
-                    write!(self.output, "    lea rax, [rel {}]\n", variable.scoped_name);
+                    let offset = op.operands()[0].as_uint();
+                    write!(self.output, "    mov rax, [rbp-{:x}]\n", offset);
                     write!(self.output, "    push rax\n");
                     // We have resolved a value from a variables onto the stack.
                     self.current.gc_count += 1;
@@ -193,14 +190,11 @@ impl NasmBackend {
                 OpKind::NewString => {
                     let data = op.operands()[0].as_data(); 
                     let scoped_name = self.current.append_data(data.clone());
-                    write!(self.output, "    lea rax, [rel {}]\n", scoped_name);
+
+                    write!(self.output, "    mov rax,{}\n", scoped_name);
                     write!(self.output, "    push rax\n");
+
                     self.current.gc_count += 1;
-                }
-                OpKind::ResolveString => {
-                    write!(self.output, "    pop rax\n");             
-                    write!(self.output, "    mov rdi, [rax]\n");
-                    write!(self.output, "    push rdi\n");
                 }
                 OpKind::NewStruct => {
                     let size = op.operands()[0].as_uint();
@@ -219,6 +213,7 @@ impl NasmBackend {
                         self.current.gc_count -= 1;
                     }
 
+                    write!(self.output, "    xor eax, eax\n");
                     write!(self.output, "    call {}\n", symbol);
                     write!(self.output, "    push rax\n");
 
@@ -259,6 +254,7 @@ impl NasmBackend {
             for byte in value.1.as_bytes() {
                 write!(self.output, "{}, ", byte);
             }
+            write!(self.output, "00");
             write!(self.output, "\n");
         }
         write!(self.output, "segment .bss\n");

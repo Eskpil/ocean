@@ -3,6 +3,7 @@ use super::op::{Op, OpKind, Operand};
 use super::generator::Generator;
 use crate::types::{
     TypeId,
+    ScopeId,
 
     CheckedStatement,
     CheckedBlock,
@@ -44,20 +45,60 @@ pub fn generate_statement(
         CheckedStatement::Expression(expr) => 
             generate_expression(project, expr, generator),
         CheckedStatement::VariableDecl(var) =>
-            generate_variable(project, var, generator),
+            generate_variable_decl(project, var, generator),
     }
 }
 
-pub fn generate_variable(
+pub fn generate_variable_decl(
     project: &Project,
     var: &CheckedVariableDecl,
     generator: &mut Generator,
 ) {
     generate_expression(project, &var.expr, generator);  
+    
+    let scope_id = var.scope_id;
+    let mut offset: u64 = 0;
+
+    for scope_var in project.scope_variables(scope_id).iter() {
+        if scope_var.name == var.name {
+            break;
+        } else {
+            offset += project.get_type_size(scope_var.type_id).unwrap() as u64; 
+        } 
+    }
+
     let op = Op::single(
         OpKind::NewVariable, 
-        Operand::Symbol(var.name.clone())
+        Operand::Uint(offset),
     );
+
+    generator.append(op);
+}
+
+pub fn generate_variable_lookup(
+    project: &Project,
+    name: String,
+    scope_id: ScopeId,
+    generator: &mut Generator,
+) {
+    let var = project.find_variable(name.clone(), scope_id).unwrap();
+
+    let scope_id = var.scope_id; 
+    let mut offset: u64 = 0;
+
+    for scope_var in project.scope_variables(scope_id).iter() {
+        if scope_var.name == var.name {
+            break;
+        } else {
+            offset += project.get_type_size(scope_var.type_id).unwrap() as u64;
+        }
+    }
+
+    let op = Op::single(
+        OpKind::ResolveVariable,
+        Operand::Uint(offset),
+    );
+
     generator.append(op);
 }
 
@@ -70,21 +111,6 @@ pub fn generate_binary_expression(
     generate_expression(project, &*expr.rhs, generator);
     let op = Op::single(OpKind::Intrinsic, Operand::Op(expr.op));
     generator.append(op);
-}
-
-pub fn generate_identifier_expression(
-    project: &Project,
-    name: String,
-    type_id: TypeId,
-    generator: &mut Generator,
-) {
-    let op = Op::single(OpKind::ResolveVariable, Operand::Symbol(name));  
-    generator.append(op);
-
-    if type_id == project.lookup_type("String".into()).unwrap() {
-        let op = Op::none(OpKind::ResolveString); 
-        generator.append(op);
-    }
 }
 
 pub fn generate_call_expression(
@@ -124,11 +150,11 @@ pub fn generate_expression(
         CheckedExpression::Call(call) => 
             generate_call_expression(project, call, generator),
         CheckedExpression::Identifier(v, id) => 
-            generate_identifier_expression(
-                project, 
-                v.to_string(), 
-                *id, 
-                generator
+            generate_variable_lookup(
+                project,
+                v.to_string(),
+                *id,
+                generator,
             ),
         o => todo!("Implement expression: {:?}", o),
     }
@@ -148,11 +174,16 @@ pub fn generate_function(
 
         generator.append(op);
 
+        let mut offset = 0;
+
         for param in function.parameters.iter() {
             let op = Op::single(
                 OpKind::NewVariable,
-                Operand::Symbol(param.name.clone()),
+                Operand::Uint(offset),
             );
+
+            let size = project.get_type_size(param.type_id).unwrap() as u64;
+            offset += size;
 
             generator.append(op);
         }

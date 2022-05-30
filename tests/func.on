@@ -7,5 +7,7 @@ fn person(name: String, age: Int) {
 }
 
 fn program() {
-    person(name: "John", age: 40);
+    let name = "John";
+    let age = 40;
+    person(name: name, age: age);
 }

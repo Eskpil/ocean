@@ -71,12 +71,14 @@ pub struct CheckedFunction {
 pub struct CheckedVariable {
     pub name: String,    
     pub type_id: TypeId,
+    pub scope_id: ScopeId,
 }
 
 #[derive(Debug, Clone)]
 pub struct CheckedVariableDecl {
     pub name: String,    
     pub type_id: TypeId,
+    pub scope_id: ScopeId,
     pub expr: CheckedExpression,
 }
 
@@ -85,7 +87,7 @@ pub enum CheckedExpression {
     Literal(u64),
     Empty,
     StringLiteral(String),
-    Identifier(String, TypeId),
+    Identifier(String, ScopeId),
     Binary(CheckedBinaryExpression),    
     Call(CheckedFunctionCall),
 }
@@ -154,10 +156,12 @@ impl CheckedVariable {
     pub fn new(
         name: String, 
         type_id: TypeId, 
+        scope_id: ScopeId
     ) -> Self {
         Self {
             name,
             type_id,
+            scope_id,
         }
     }    
 }
@@ -166,11 +170,13 @@ impl CheckedVariableDecl {
     pub fn new(
         name: String, 
         type_id: TypeId, 
+        scope_id: ScopeId,
         expr: CheckedExpression,
     ) -> Self {
         Self {
             name,
             type_id,
+            scope_id,
             expr,
         }
     }    

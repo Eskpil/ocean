@@ -1,6 +1,8 @@
+fn putchar(char: Int);
+
 fn program() {
   let a = 1 + 2 * 5;
   let b = 8 / 2;
-  a + b;
+  let c = a + b;
 }
 

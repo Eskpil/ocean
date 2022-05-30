@@ -100,7 +100,7 @@ impl Project {
     }
 
     pub fn find_variable(
-        &mut self,
+        &self,
         name: String,
         scope_id: ScopeId,
     ) -> Result<CheckedVariable, TypeError> {
@@ -109,14 +109,35 @@ impl Project {
         Ok(var)
     }
 
+    pub fn scope_variables(
+        &self,
+        scope_id: ScopeId,
+    ) -> Vec<CheckedVariable> {
+        let scope = &self.scopes[scope_id];     
+        let vars = scope.variables.clone();
+        vars
+    }
+
     pub fn find_function(
-        &mut self,
+        &self,
         name: String,
         scope_id: ScopeId,
     ) -> Result<CheckedFunction, TypeError> {
         let scope = &self.scopes[scope_id]; 
         let function = scope.find_function(name.clone())?;
         Ok(function)
+    }
+
+    pub fn get_type_size(&self, type_id: TypeId) -> Result<usize, TypeError> {
+        if type_id == 0 {
+            Ok(8)
+        } else if type_id == 1 {
+            Ok(8)
+        } else if type_id == 2 {
+            Ok(8)
+        } else {
+            Ok(8) 
+        }
     }
 
     pub fn allocate_type(&mut self, name: String) -> TypeId {
@@ -206,7 +227,10 @@ impl Project {
         match expr {
             CheckedExpression::Literal(_) => self.lookup_type("Int".to_string()),
             CheckedExpression::StringLiteral(_) => self.lookup_type("String".to_string()),
-            CheckedExpression::Identifier(_, id) => Ok(*id),
+            CheckedExpression::Identifier(name, scope) => {
+                let var = self.find_variable(name.clone(), *scope)?;
+                Ok(var.type_id)
+            },
             CheckedExpression::Binary(_) => self.lookup_type("Int".to_string()),
             o => todo!("Get TypeId from {:?}", o),
         }  
@@ -251,8 +275,7 @@ impl Project {
             Expression::StringLiteral(v) => CheckedExpression::StringLiteral(v.to_string()),
             Expression::Identifier(name) => {
                 let variable = self.find_variable(name.to_string(), scope_id)?;
-                let type_id = variable.type_id;
-                CheckedExpression::Identifier(name.to_string(), type_id) 
+                CheckedExpression::Identifier(name.to_string(), scope_id) 
             }
             Expression::Call(name, arguments) => {
                 let call = self.typecheck_function_call(
@@ -353,12 +376,14 @@ impl Project {
         let checked_variable_decl = CheckedVariableDecl::new(
             name.clone(), 
             type_id, 
+            scope_id,
             checked_expression
         );
 
         let checked_variable = CheckedVariable::new(
             name.clone(),
             type_id,
+            scope_id,
         );
 
         self.add_variable_to_scope(checked_variable.clone(), scope_id);
@@ -391,7 +416,7 @@ impl Project {
         let block_scope_id = self.create_scope(scope_id);
 
         for param in parameters.iter() {
-            let var = CheckedVariable::new(param.name.clone(), param.type_id);
+            let var = CheckedVariable::new(param.name.clone(), param.type_id, scope_id);
             self.add_variable_to_scope(var, block_scope_id);
         }
 
