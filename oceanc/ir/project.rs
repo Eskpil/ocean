@@ -14,6 +14,7 @@ use crate::types::{
     CheckedBinaryExpression,
     CheckedFunctionCall,
     CheckedIfStatement,
+    CheckedWhileStatement,
 };
 
 pub fn generate_project(project: &Project, generator: &mut Generator) {
@@ -52,7 +53,32 @@ pub fn generate_statement(
             generate_variable_decl(project, var, generator),
         CheckedStatement::If(stmt) =>
             generate_if_statement(project, stmt, generator),
+        CheckedStatement::While(stmt) =>
+            generate_while_statement(project, stmt, generator),
+        o => todo!("Implement generating of {:?} statement", o),
     }
+}
+
+pub fn generate_while_statement(
+    project: &Project,
+    stmt: &CheckedWhileStatement,
+    generator: &mut Generator,
+) {
+    let end_label = generator.allocate_label();
+    let expression_label = generator.allocate_label();                  
+
+    generator.append(Op::single(OpKind::Block, Operand::Symbol(expression_label.clone())));
+    generate_expression(project, &stmt.cond, generator);
+    generator.append(Op::single(OpKind::JumpUnless, Operand::Symbol(end_label.clone())));
+
+    let body_label = generator.allocate_label();
+    generator.append(Op::single(OpKind::Block, Operand::Symbol(body_label)));
+
+    generate_block(project, &stmt.body, generator);
+    
+    generator.append(Op::single(OpKind::Jump, Operand::Symbol(expression_label.clone())));
+
+    generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
 }
 
 pub fn generate_if_statement(

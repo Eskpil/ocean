@@ -19,6 +19,7 @@ use super::{
     CheckedFunctionCall,
     CheckedIfStatement,
     CheckedVariableDecl,
+    CheckedWhileStatement,
 
     BOOL_TYPE_ID,
     STRING_TYPE_ID,
@@ -223,10 +224,38 @@ impl Project {
                 let checked_expr = self.typecheck_expression(expr, scope_id)?; 
                 CheckedStatement::Expression(checked_expr)
             }
+            Statement::While(cond, body) => {
+                let checked_stmt = self.typecheck_while_statement(
+                    cond,
+                    body.clone(),
+                    scope_id,
+                )?;
+
+                CheckedStatement::While(checked_stmt)
+            }
             o => todo!("Implement typechecking for {:?}", o),
         }; 
 
         Ok(checked_stmt)
+    }
+
+    pub fn typecheck_while_statement(
+        &mut self,
+        cond: &Expression,
+        body: Vec<Statement>,
+        scope_id: ScopeId,
+    ) -> Result<CheckedWhileStatement, TypeError> {
+        let cond = self.typecheck_expression(cond, scope_id)?; 
+
+        let type_id = self.get_expression_type_id(&cond, scope_id)?;
+
+        if type_id != self.lookup_type("Bool".into())? {
+            todo!("Error messages for expressions not returning boolean");  
+        }
+
+        let checked_body = self.typecheck_block(body, scope_id)?;
+        
+        Ok(CheckedWhileStatement::new(cond, checked_body))
     }
 
     pub fn typecheck_if_statement(

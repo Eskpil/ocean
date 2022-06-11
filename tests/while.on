@@ -1,9 +1,7 @@
+fn printf(message: String);
+
 fn program() {
-  let a = 1 + 2;
-
-  while true { 
-    let hello = "Hello!";
-  };
-
-  let b = a + 2;
+    while true { 
+        printf(message: "Hello\n");
+    };
 }

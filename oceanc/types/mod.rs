@@ -56,6 +56,12 @@ pub struct CheckedIfStatement {
 }
 
 #[derive(Debug, Clone)]
+pub struct CheckedWhileStatement {
+    pub cond: CheckedExpression, 
+    pub body: CheckedBlock,
+}
+
+#[derive(Debug, Clone)]
 pub struct CheckedBinaryExpression {
     pub lhs: Box<CheckedExpression>, 
     pub rhs: Box<CheckedExpression>,
@@ -113,6 +119,7 @@ pub enum CheckedStatement {
     VariableDecl(CheckedVariableDecl),
     If(CheckedIfStatement),
     Block(CheckedBlock),
+    While(CheckedWhileStatement),
 }
 
 impl CheckedIfStatement {
@@ -125,6 +132,18 @@ impl CheckedIfStatement {
             cond,
             if_block,
             else_block,
+        }
+    }
+}
+
+impl CheckedWhileStatement {
+    pub fn new(
+        cond: CheckedExpression,
+        body: CheckedBlock,
+    ) -> Self {
+        Self {
+            cond,
+            body
         }
     }
 }
