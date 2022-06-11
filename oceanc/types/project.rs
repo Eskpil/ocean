@@ -21,6 +21,7 @@ use super::{
     CheckedVariableDecl,
     CheckedWhileStatement,
 
+    VOID_TYPE_ID,
     BOOL_TYPE_ID,
     STRING_TYPE_ID,
     INT_TYPE_ID,
@@ -33,6 +34,7 @@ use crate::ast::{
         Definition,
         StructDefinition,
         FieldDefinition,
+        DefinedType,
     },
     statements::{
         Statement,
@@ -59,6 +61,7 @@ impl Project {
     pub fn new() -> Self {
         let mut types = HashMap::new();
 
+        types.insert("Void".to_string(), VOID_TYPE_ID);
         types.insert("Bool".to_string(), BOOL_TYPE_ID);
         types.insert("Int".to_string(), INT_TYPE_ID);
         types.insert("String".to_string(), STRING_TYPE_ID);
@@ -193,11 +196,12 @@ impl Project {
 
                 CheckedStatement::Define
             },
-            Statement::Function(name, parameters, children) => {
+            Statement::Function(name, parameters, children, defined) => {
                 let function = self.typecheck_function(
                     name.clone(), 
                     &parameters, 
                     children.clone(), 
+                    defined,
                     scope_id
                 )?;
                 self.functions.push(function.clone());
@@ -305,6 +309,11 @@ impl Project {
                 }
             }
             CheckedExpression::Bool(_) => self.lookup_type("Bool".to_string()),
+            CheckedExpression::Call(call) => {
+                let function = self.find_function(call.name.clone(), scope_id)?;
+
+                Ok(function.returning)
+            }
             o => todo!("Get TypeId from {:?}", o),
         }  
     }
@@ -447,6 +456,10 @@ impl Project {
         let checked_expression = self.typecheck_expression(expression, scope_id)?;
         let type_id = self.get_expression_type_id(&checked_expression, scope_id)?;
 
+        if type_id == VOID_TYPE_ID {
+            return Err(TypeError::VoidAssignment); 
+        }
+
         // Used for IR generation.
         let checked_variable_decl = CheckedVariableDecl::new(
             name.clone(), 
@@ -518,9 +531,16 @@ impl Project {
         name: String, 
         parameters: &Vec<NamedParameter>,
         children: Vec<Statement>,
+        defined_type: &DefinedType,
         scope_id: ScopeId,
     ) -> Result<CheckedFunction, TypeError> {
         let mut checked_parameters = Vec::<CheckedNamedParameter>::new();
+        let mut returning: TypeId = VOID_TYPE_ID;
+
+        if let DefinedType::Name(name) = defined_type.clone() {
+            let type_id = self.lookup_type(name.clone())?;
+            returning = type_id; 
+        } 
 
         for parameter in parameters.iter() {
             match checked_parameters.iter().find(
@@ -542,7 +562,8 @@ impl Project {
         let mut checked_function = CheckedFunction::new(
             name.clone(), 
             checked_parameters.clone(),
-            None
+            None,
+            returning,
         );
         if children.len() > 0 {
             let checked_block = self.typecheck_function_block(
@@ -553,7 +574,8 @@ impl Project {
             checked_function = CheckedFunction::new(
                 name.clone(), 
                 checked_parameters.clone(),
-                Some(checked_block)
+                Some(checked_block),
+                returning,
             );
         }
 

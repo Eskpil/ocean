@@ -12,4 +12,5 @@ pub enum TypeError {
     DuplicateFunctionCallArgument(String),
     ExhaustiveFunctionCallArguments(usize, Vec<CheckedNamedArgument>),
     UnknownFunctionArgument(String),
+    VoidAssignment,
 }

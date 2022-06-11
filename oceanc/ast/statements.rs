@@ -18,7 +18,7 @@ pub enum Statement {
     Define(Definition),
     Block(Vec<Statement>),
     If(Expression, Vec<Statement>, Option<Vec<Statement>>),
-    Function(String, Vec<NamedParameter>, Vec<Statement>),
+    Function(String, Vec<NamedParameter>, Vec<Statement>, DefinedType),
     Expression(Expression),
     While(Expression, Vec<Statement>),
     Declaration(String, Expression),
@@ -68,7 +68,7 @@ impl Statement {
                     }
                 }
             }
-            Statement::Function(name, parameters, children) => {
+            Statement::Function(name, parameters, children, defined) => {
                 util::print_indent(indent, "FunctionStatement:".into());
                 util::print_indent(indent + 1, "Name:".into());
                 util::print_indent(indent + 2, name);
@@ -76,6 +76,7 @@ impl Statement {
                 for child in children.iter() {
                     child.print(indent + 2);
                 }
+                defined.print(indent + 1);
             }
             Statement::Expression(expr) => {
                 util::print_indent(indent, "ExpressionStatement:".into());
@@ -150,7 +151,7 @@ impl Statement {
 
                 generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
             }
-            Statement::Function(name, parameters, children) => {
+            Statement::Function(name, parameters, children, _) => {
                 if children.len() > 0 {
                     let op = Op::double(
                         OpKind::Proc, 

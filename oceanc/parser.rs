@@ -454,15 +454,30 @@ impl Parser {
 
         self.consume(TokenKind::RightParen)?;
 
+        let mut type_name = String::from("Void");
+
+        if self.peek() == TokenKind::Arrow {
+            self.consume(TokenKind::Arrow)?;  
+            let identifier = self.consume_next(TokenKind::Identifier)?;     
+            type_name = identifier.value.clone();
+        }
+
+        let mut body: Vec<Statement> = vec![];
+
         if self.peek() == TokenKind::Semicolon {
             self.consume(TokenKind::Semicolon)?;   
-            let function = Statement::Function(name, parameters, vec![]);
-            Ok(function)
         } else {
-            let body = self.parse_block_body()?; 
-            let function = Statement::Function(name, parameters, body);
-            Ok(function)
+            body = self.parse_block_body()?;
         }
+        
+        let function = Statement::Function(
+            name, 
+            parameters, 
+            body, 
+            DefinedType::name(type_name)
+        );
+
+        Ok(function)
     }
 
     pub fn parse_statement(&mut self) -> ParseResult<Statement> {

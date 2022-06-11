@@ -7,9 +7,10 @@ use crate::ast::BinaryOp;
 pub type TypeId = usize;
 pub type ScopeId = usize;
 
-pub const INT_TYPE_ID: TypeId = 0;
-pub const BOOL_TYPE_ID: TypeId = 1;
-pub const STRING_TYPE_ID: TypeId = 2;
+pub const VOID_TYPE_ID: TypeId = 0;
+pub const INT_TYPE_ID: TypeId = 1;
+pub const BOOL_TYPE_ID: TypeId = 2;
+pub const STRING_TYPE_ID: TypeId = 3;
 
 pub type DefinitionResult = Result<CheckedDefinition, TypeError>;
 pub type StatementResult = Result<CheckedStatement, TypeError>;
@@ -78,6 +79,7 @@ pub struct CheckedFunction {
     pub name: String, 
     pub block: Option<CheckedBlock>,
     pub parameters: Vec<CheckedNamedParameter>,
+    pub returning: TypeId,
 }
 
 #[derive(Debug, Clone)]
@@ -228,12 +230,14 @@ impl CheckedFunction {
     pub fn new(
         name: String, 
         parameters: Vec<CheckedNamedParameter>,
-        block: Option<CheckedBlock>
+        block: Option<CheckedBlock>,
+        returning: TypeId,
     ) -> Self {
         Self {
             name,
             parameters,
             block,
+            returning
         }     
     }
 }

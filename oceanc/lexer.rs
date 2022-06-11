@@ -38,6 +38,7 @@ pub enum TokenKind {
     Or,
 
     While,
+    Arrow,
 
     True,
     False,
@@ -112,6 +113,7 @@ impl TokenKind {
             TokenKind::Or => "or".into(),
 
             TokenKind::While => "while".into(),
+            TokenKind::Arrow => "->".into(),
 
             TokenKind::True => "true".into(),
             TokenKind::False => "false".into(),
@@ -406,9 +408,17 @@ impl Iterator for Lexer {
                 Some(token)
             }
             '-' => {
-                let token = Token::kind_loc(TokenKind::Sub, self.row, self.col);
+                let row = self.row;
+                let col = self.col;
                 self.advance();
-                Some(token)
+                if self.peek() == '>' {
+                    self.advance();
+                    let token = Token::kind_loc(TokenKind::Arrow, row, col); 
+                    Some(token)
+                } else {
+                    let token = Token::kind_loc(TokenKind::Sub, row, col);
+                    Some(token)
+                }
             }
             '/' => {
                 let token = Token::kind_loc(TokenKind::Div, self.row, self.col);

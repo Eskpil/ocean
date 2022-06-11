@@ -45,11 +45,27 @@ impl Definition {
 }
 
 impl DefinedType {
+    pub fn name(name: String) -> Self {
+        Self::Name(name)
+    }
+    
     pub fn to_name(&self) -> String {
         match self {
             DefinedType::Name(n) => n.clone(),   
             o => unreachable!("Expected DefinedType::Name() but found DefinedType::{:?}", o),
         }
+    }
+
+    pub fn print(&self, indent: usize) {
+        match self {
+            DefinedType::Name(s) => {
+                util::print_indent(indent, "Name:".into()); 
+                util::print_indent(indent + 1, s.clone());
+            } 
+            DefinedType::Empty => {
+                util::print_indent(indent, "Empty".into());
+            }
+        } 
     }
 }
 
