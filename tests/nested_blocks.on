@@ -1,8 +1,13 @@
+fn printf(message: String);
+
 fn program() { 
     let a = 2 + 2;
+    printf(message: "Program\n");
     {
         let b = 3;
+        printf(message: "Block_0\n");
         {
+            printf(message: "Block_1\n");
             let c = a + b;
         };
     };

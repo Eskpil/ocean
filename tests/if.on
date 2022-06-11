@@ -1,9 +1,9 @@
-fn program() {
-    if true {
-        let happy = true;
-    } else {
-        let happy = false;
-    };
+fn printf(message: String);
 
-    let a = 1 + 2;
+fn program() {
+    if 1 < 0 {
+        printf(message: "Happy\n");
+    } else {
+        printf(message: "Not happy\n");
+    };
 }

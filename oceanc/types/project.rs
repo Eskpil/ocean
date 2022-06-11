@@ -17,6 +17,7 @@ use super::{
     CheckedNamedParameter,
     CheckedNamedArgument,
     CheckedFunctionCall,
+    CheckedIfStatement,
     CheckedVariableDecl,
 
     BOOL_TYPE_ID,
@@ -209,6 +210,15 @@ impl Project {
                 let block = self.typecheck_block(body.clone(), scope_id)?;
                 CheckedStatement::Block(block)     
             }
+            Statement::If(cond, if_block, else_block) => {
+                let stmt = self.typecheck_if_statement(
+                    cond, 
+                    if_block.clone(), 
+                    else_block.clone(), 
+                    scope_id
+                )?;
+                CheckedStatement::If(stmt)
+            }
             Statement::Expression(expr) => {
                 let checked_expr = self.typecheck_expression(expr, scope_id)?; 
                 CheckedStatement::Expression(checked_expr)
@@ -217,6 +227,33 @@ impl Project {
         }; 
 
         Ok(checked_stmt)
+    }
+
+    pub fn typecheck_if_statement(
+        &mut self,
+        cond: &Expression,
+        if_block: Vec<Statement>,
+        else_block: Option<Vec<Statement>>,
+        scope_id: ScopeId,
+    ) -> Result<CheckedIfStatement, TypeError> {
+        let cond = self.typecheck_expression(cond, scope_id)?;  
+
+        let type_id = self.get_expression_type_id(&cond, scope_id)?;
+
+        if type_id != self.lookup_type("Bool".into())? {
+            todo!("Error messages for expressions not returning boolean");  
+        }
+
+        let checked_if_block = self.typecheck_block(if_block, scope_id)?;
+
+        let mut checked_else_block: Option<CheckedBlock> = None;
+
+        if let Some(block) = else_block {
+            let output = self.typecheck_block(block, scope_id)?;
+            checked_else_block = Some(output); 
+        }
+
+        Ok(CheckedIfStatement::new(cond, checked_if_block, checked_else_block))
     }
 
     pub fn get_expression_type_id(
@@ -231,7 +268,14 @@ impl Project {
                 let var = self.find_variable(name.clone(), *scope)?;
                 Ok(var.type_id)
             },
-            CheckedExpression::Binary(_) => self.lookup_type("Int".to_string()),
+            CheckedExpression::Binary(expr) => {
+                if expr.op.returns_bool() {
+                    self.lookup_type("Bool".to_string())
+                } else { 
+                    self.lookup_type("Int".to_string())
+                }
+            }
+            CheckedExpression::Bool(_) => self.lookup_type("Bool".to_string()),
             o => todo!("Get TypeId from {:?}", o),
         }  
     }
@@ -286,10 +330,12 @@ impl Project {
 
                 CheckedExpression::Call(call)
             }
+
             Expression::Binary(op, lhs, rhs) => {
                 let expr = self.typecheck_binary_expression(&*lhs, &*rhs, op, scope_id)?;
                 CheckedExpression::Binary(expr)
             }
+            Expression::Bool(v) => CheckedExpression::Bool(v.clone()),
             o => unreachable!("Implement typechecking for expression: {:?}", o)
         };
 

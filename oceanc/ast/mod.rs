@@ -38,6 +38,16 @@ impl BinaryOp {
         } 
     }
 
+    pub fn returns_bool(&self) -> bool {
+        match self.clone() {
+            Self::Greater 
+            | Self::Less
+            | Self::GreaterEquals
+            | Self::LessEquals => true,
+            _ => false,              
+        } 
+    }
+
     pub fn to_string(&self) -> String {
         let s = match self.clone() {
             Self::Add => "+",

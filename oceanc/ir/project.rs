@@ -13,6 +13,7 @@ use crate::types::{
     CheckedVariableDecl,
     CheckedBinaryExpression,
     CheckedFunctionCall,
+    CheckedIfStatement,
 };
 
 pub fn generate_project(project: &Project, generator: &mut Generator) {
@@ -40,13 +41,69 @@ pub fn generate_statement(
         CheckedStatement::Define => {},   
         CheckedStatement::Function(func) => 
             generate_function(project, func, generator),
-        CheckedStatement::Block(block) => 
-            generate_block(project, block, generator),
+        CheckedStatement::Block(block) => { 
+            let label = generator.allocate_label();
+            generator.append(Op::single(OpKind::Block, Operand::Symbol(label)));
+            generate_block(project, block, generator);
+        }
         CheckedStatement::Expression(expr) => 
             generate_expression(project, expr, generator),
         CheckedStatement::VariableDecl(var) =>
             generate_variable_decl(project, var, generator),
+        CheckedStatement::If(stmt) =>
+            generate_if_statement(project, stmt, generator),
     }
+}
+
+pub fn generate_if_statement(
+    project: &Project,
+    stmt: &CheckedIfStatement,
+    generator: &mut Generator,
+) {
+    let end_label = generator.allocate_label();
+    let true_block = generator.allocate_label();
+    generate_expression(project, &stmt.cond, generator);
+
+    if let Some(block) = &stmt.else_block {
+        let else_block = generator.allocate_label(); 
+        generator.append(Op::single(
+                OpKind::JumpUnless, 
+                Operand::Symbol(else_block.clone())
+        ));
+
+        generator.append(Op::single(
+                OpKind::Block,
+                Operand::Symbol(true_block.clone()),
+        ));
+        generate_block(project, &stmt.if_block, generator);
+        
+        generator.append(Op::single(
+                OpKind::Jump,
+                Operand::Symbol(end_label.clone()),
+        ));
+
+        generator.append(Op::single(
+                OpKind::Block,
+                Operand::Symbol(else_block.clone()),
+        ));
+        generate_block(project, &block, generator);
+    } else {
+        generator.append(Op::single(
+            OpKind::JumpUnless,
+            Operand::Symbol(end_label.clone()),
+        ));
+        generator.append(Op::single(
+            OpKind::Block,
+            Operand::Symbol(true_block.clone()),
+        ));
+
+        generate_block(project, &stmt.if_block, generator);
+    }
+
+    generator.append(Op::single(
+        OpKind::Block,
+        Operand::Symbol(end_label.clone()),
+    ));
 }
 
 pub fn generate_variable_decl(
@@ -145,6 +202,13 @@ pub fn generate_expression(
         }
         CheckedExpression::StringLiteral(v) => {
             let op = Op::single(OpKind::NewString, Operand::Data(v.clone()));
+            generator.append(op);
+        }
+        CheckedExpression::Bool(v) => {
+            let mut op = Op::single(OpKind::Push, Operand::Uint(0)); 
+            if *v {
+                op = Op::single(OpKind::Push, Operand::Uint(1));
+            }
             generator.append(op);
         }
         CheckedExpression::Call(call) => 

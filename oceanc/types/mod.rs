@@ -49,6 +49,13 @@ pub struct CheckedStruct {
 }
 
 #[derive(Debug, Clone)]
+pub struct CheckedIfStatement {
+    pub cond: CheckedExpression, 
+    pub if_block: CheckedBlock,
+    pub else_block: Option<CheckedBlock>,
+}
+
+#[derive(Debug, Clone)]
 pub struct CheckedBinaryExpression {
     pub lhs: Box<CheckedExpression>, 
     pub rhs: Box<CheckedExpression>,
@@ -90,6 +97,7 @@ pub enum CheckedExpression {
     Identifier(String, ScopeId),
     Binary(CheckedBinaryExpression),    
     Call(CheckedFunctionCall),
+    Bool(bool)
 }
 
 #[derive(Debug, Clone)]
@@ -103,7 +111,22 @@ pub enum CheckedStatement {
     Function(CheckedFunction), 
     Expression(CheckedExpression),
     VariableDecl(CheckedVariableDecl),
+    If(CheckedIfStatement),
     Block(CheckedBlock),
+}
+
+impl CheckedIfStatement {
+    pub fn new(
+        cond: CheckedExpression,
+        if_block: CheckedBlock,
+        else_block: Option<CheckedBlock>,
+    ) -> Self {
+        Self {
+            cond,
+            if_block,
+            else_block,
+        }
+    }
 }
 
 impl CheckedFunctionCall {

@@ -59,12 +59,18 @@ impl NasmBackend {
             match op.kind() {
                 OpKind::Block => {
                     let symbol = op.operands()[0].as_symbol(); 
+                    for i in 0..self.current.gc_count {
+                        write!(self.output, "    pop rax\n");
+                    }
                     self.new_scope(symbol.clone());
                     write!(self.output, "    {}:\n", symbol);
                 } 
                 OpKind::Proc => {
                     let symbol = op.operands()[0].as_symbol();
                     let parameters_size = op.operands()[1].as_uint();
+                    for i in 0..self.current.gc_count {
+                        write!(self.output, "    pop rax\n");
+                    }
                     self.new_scope(symbol.clone());
                     write!(self.output, "    {}:\n", symbol);
                     write!(self.output, "    push rbp\n");
@@ -130,12 +136,14 @@ impl NasmBackend {
                             self.current.gc_count -= 1;                           
                         }
                         BinaryOp::Greater => {
-                           write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
-                           write!(self.output, "    pop rbx\n"); // 1 > 0 in this case we have 1.
-                           write!(self.output, "    cmp rbx, rax\n");
-                           write!(self.output, "    setg al\n");
-                           write!(self.output, "    movzx rax, al\n");
-                           write!(self.output, "    push rax\n");
+                           write!(self.output, "    mov rcx, 0\n"); 
+                           write!(self.output, "    mov rdx, 1\n");
+                           write!(self.output, "    pop rbx\n");
+                           write!(self.output, "    pop rax\n");
+                           write!(self.output, "    cmp rax, rbx\n");
+                           write!(self.output, "    cmovg rcx, rdx\n");
+                           write!(self.output, "    push rcx\n");
+
                            // 2 - 1 = 1. We have taken one element of the stack.
                            self.current.gc_count -= 1;
                         }
@@ -221,13 +229,17 @@ impl NasmBackend {
                 }
                 OpKind::Jump => {
                     let symbol = op.operands()[0].as_symbol();
+                    for i in 0..self.current.gc_count {
+                        write!(self.output, "    pop rax\n");
+                    }
                     write!(self.output, "    jmp {}\n", symbol);
                 }
                 OpKind::JumpUnless => {
                     let symbol = op.operands()[0].as_symbol();
                     write!(self.output, "    pop rax\n");
-                    write!(self.output, "    cmp rax, 0\n");
-                    write!(self.output, "    je {}\n", symbol);
+                    write!(self.output, "    test rax, rax\n");
+                    write!(self.output, "    jz {}\n", symbol);
+                    self.current.gc_count -= 1;
                 }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 
             }

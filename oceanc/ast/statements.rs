@@ -126,7 +126,10 @@ impl Statement {
 
                 if let Some(block) = else_block {
                     let else_label = generator.allocate_label();
-                    generator.append(Op::single(OpKind::JumpUnless, Operand::Symbol(else_label.clone())));
+                    generator.append(Op::single(
+                            OpKind::JumpUnless, 
+                            Operand::Symbol(else_label.clone())
+                    ));
 
                     generator.append(Op::single(OpKind::Block, Operand::Symbol(if_label.clone())));
                     for child in if_block.iter() {
@@ -143,7 +146,7 @@ impl Statement {
                     for child in if_block.iter() {
                         child.generate(generator);
                     }
-            }
+                }
 
                 generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
             }
