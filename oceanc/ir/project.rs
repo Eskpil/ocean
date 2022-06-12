@@ -12,6 +12,9 @@ use crate::types::{
 
     VOID_TYPE_ID,
     STRING_TYPE_ID,
+    PTR_TYPE_ID,
+    BOOL_TYPE_ID,
+    INT_TYPE_ID,
 
     CheckedStatement,
     CheckedBlock,
@@ -41,6 +44,25 @@ pub fn generate_block(
     for stmt in block.children.iter() {
         generate_statement(project, stmt, generator);
     } 
+
+    let scope_id = block.scope_id.clone();
+
+    for variable in project.scope_variables(scope_id) {
+
+        if !variable.is_referenced && variable.type_id > PTR_TYPE_ID {
+            let mut offset = 0;
+
+            for scope_var in project.scope_variables(scope_id).iter() {
+                if scope_var.name == variable.name {
+                    break;
+                } else {
+                    offset += project.get_type_size(scope_var.type_id).unwrap() as u64; 
+                } 
+            }
+
+            generator.append(Op::single(OpKind::Deref, Operand::Uint(offset)));
+        }
+    }
 }
 
 pub fn generate_statement(
@@ -162,18 +184,38 @@ pub fn generate_variable_decl(
     
     let scope_id = var.scope_id;
     let mut offset: u64 = 0;
+    let mut is_reference = false;
 
     for scope_var in project.scope_variables(scope_id).iter() {
         if scope_var.name == var.name {
             break;
         } else {
+            if scope_var.is_referenced {
+                is_reference = true;
+            }
+
             offset += project.get_type_size(scope_var.type_id).unwrap() as u64; 
         } 
     }
 
-    let op = Op::single(
+    let mut typ = Type::Object;
+
+    if var.type_id == PTR_TYPE_ID || var.type_id == STRING_TYPE_ID {
+        typ = Type::Ptr;
+    } else if var.type_id == INT_TYPE_ID || var.type_id == BOOL_TYPE_ID {
+        typ = Type::Num;
+    } else {
+        typ = Type::Object;
+    } 
+
+    if is_reference {
+        typ = Type::Reference; 
+    }
+
+    let op = Op::double(
         OpKind::NewVariable, 
         Operand::Uint(offset),
+        Operand::Type(typ),
     );
 
     generator.append(op);

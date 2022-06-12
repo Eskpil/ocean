@@ -21,7 +21,7 @@ pub enum Statement {
     Function(String, Vec<NamedParameter>, Vec<Statement>, DefinedType),
     Expression(Expression),
     While(Expression, Vec<Statement>),
-    Declaration(String, Expression),
+    Declaration(String, Expression, bool),
     Return(Expression),
 }
 
@@ -92,11 +92,13 @@ impl Statement {
                     child.print(indent + 2);
                 }
             }
-            Statement::Declaration(name, expr) => {
+            Statement::Declaration(name, expr, referenced) => {
                 util::print_indent(indent, "DeclarationStatement:".into());
 
                 util::print_indent(indent + 1, "Name:".into());
                 util::print_indent(indent + 2, name.clone());
+                util::print_indent(indent + 1, "Referenced:".into());
+                util::print_indent(indent + 2, format!("{referenced}"));
                 expr.print(indent + 1);
             }
             _ => {},
@@ -201,7 +203,7 @@ impl Statement {
 
                 generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
             }
-            Statement::Declaration(name, expr) => {
+            Statement::Declaration(name, expr, _) => {
                 expr.generate(generator);
                 let op = Op::single(OpKind::NewVariable, Operand::Symbol(name.clone()));
                 generator.append(op);

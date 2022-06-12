@@ -1,0 +1,10 @@
+struct Person {
+    name: String
+    age: Int
+}
+
+fn program() { 
+    let person = Person[name: "John", age: 12];
+
+    let john = &person;
+}

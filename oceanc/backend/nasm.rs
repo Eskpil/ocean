@@ -30,6 +30,9 @@ impl NasmBackend {
         write!(file, "BITS 64\n");
         write!(file, "extern printf\n");
         write!(file, "extern gpa_allocate_sized\n");
+        write!(file, "extern gpa_memory_free\n");
+        write!(file, "extern gpa_memory_ref_inc\n");
+        write!(file, "extern gpa_memory_ref_dec\n");
         write!(file, "extern gpa_allocate_counted\n");
         write!(file, "extern gpa_memory_set_object_field\n");
         write!(file, "extern gpa_memory_set_num_field\n");
@@ -194,9 +197,16 @@ impl NasmBackend {
                 }
                 OpKind::NewVariable => {
                     let offset = op.operands()[0].as_uint();
+                    let typ = op.operands()[1].as_type();
                     write!(self.output, "    ; -- NewVariable -- \n");
                     write!(self.output, "    pop rax\n");
                     write!(self.output, "    mov [rbp-{:x}], rax\n", offset);
+
+                    if typ == Type::Reference {
+                        write!(self.output, "    mov {}, rax\n", self.convention.get(&0).unwrap());
+                        write!(self.output, "    call gpa_memory_ref_inc\n"); 
+                    }
+
                     // We have taken one value of the stack and moved it into a variable.
                     self.current.gc_count -= 1;
                 }
@@ -265,9 +275,20 @@ impl NasmBackend {
                     let offset = op.operands()[0].as_uint();  
                     let typ = op.operands()[1].as_type();
 
-                    write!(self.output, "    pop {}\n", self.convention.get(&2).unwrap());
-                    write!(self.output, "    pop {}\n", self.convention.get(&0).unwrap());
+                    // write!(self.output, "    pop {}\n", self.convention.get(&2).unwrap());
+                    // write!(self.output, "    pop rax\n");
+                    // write!(self.output, "    mov rax, {}\n", self.convention.get(&0).unwrap());
+                    // write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), offset);
+                    
+                    // Data
+                    write!(self.output, "    pop rax\n");
+
+                    // Memory
+                    write!(self.output, "    pop r12\n");
+
+                    write!(self.output, "    mov {}, r12\n", self.convention.get(&0).unwrap());
                     write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), offset);
+                    write!(self.output, "    mov {}, rax\n", self.convention.get(&2).unwrap());
 
                     match typ {
                         Type::Num => {
@@ -276,12 +297,13 @@ impl NasmBackend {
                         Type::Ptr => {
                             write!(self.output, "    call gpa_memory_set_ptr_field\n");
                         }
+                        Type::Reference |
                         Type::Object => {
                             write!(self.output, "    call gpa_memory_set_object_field\n");
                         }
                     }
 
-                    write!(self.output, "    push {}\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    push r12\n");
 
                     self.current.gc_count -= 1;
                 }
@@ -292,6 +314,18 @@ impl NasmBackend {
                     write!(self.output, "    call gpa_allocate_counted\n");
                     write!(self.output, "    push rax\n");
                     self.current.gc_count += 1;
+                }
+                OpKind::Deref => {
+                    let offset = op.operands()[0].as_uint();
+                    write!(self.output, "    ; -- Deref --\n");
+                    write!(self.output, "    mov rax, [rbp-{:x}]\n", offset);
+                    write!(
+                        self.output, 
+                        "    mov {}, rax\n", 
+                        self.convention.get(&0).unwrap(), 
+                    );
+
+                    write!(self.output, "    call gpa_memory_ref_dec\n");
                 }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 
             }

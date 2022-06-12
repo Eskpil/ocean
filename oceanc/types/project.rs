@@ -27,6 +27,7 @@ use super::{
     BOOL_TYPE_ID,
     STRING_TYPE_ID,
     INT_TYPE_ID,
+    PTR_TYPE_ID,
 
     scope::Scope,
 };
@@ -69,6 +70,7 @@ impl Project {
         types.insert("Bool".to_string(), BOOL_TYPE_ID);
         types.insert("Int".to_string(), INT_TYPE_ID);
         types.insert("String".to_string(), STRING_TYPE_ID);
+        types.insert("Ptr".to_string(), PTR_TYPE_ID);
 
         let program_scope = Scope::new();
 
@@ -168,21 +170,14 @@ impl Project {
         } else if type_id == 3 {
             Ok(8)
         } else {
-            for scope in self.scopes.iter() {
-                for structure in scope.structs.iter() {
-                    if structure.type_id.unwrap() == type_id {
-                        return Ok(structure.size);
-                    }
-                }     
-            }
-
             Ok(8) 
         }
     }
 
     pub fn allocate_type(&mut self, name: String) -> TypeId {
-        self.types.insert(name, self.types.len());
-        self.types.len()
+        let id = self.types.len();
+        self.types.insert(name, id.clone());
+        id
     }
 
     pub fn lookup_type(&self, name: String, scope_id: ScopeId) -> Result<TypeId, TypeError> {
@@ -247,8 +242,8 @@ impl Project {
                 self.functions.push(function.clone());
                 CheckedStatement::Function(function)
             }
-            Statement::Declaration(name, expr) => {
-                let decl = self.typecheck_variable(name.clone(), expr, scope_id)?;
+            Statement::Declaration(name, expr, is_referenced) => {
+                let decl = self.typecheck_variable(name.clone(), expr, *is_referenced, scope_id)?;
                 CheckedStatement::VariableDecl(decl)
             }
             Statement::Block(body) => {
@@ -589,10 +584,18 @@ impl Project {
         &mut self,
         name: String,
         expression: &Expression,
+        is_referenced: bool,
         scope_id: ScopeId,
     ) -> Result<CheckedVariableDecl, TypeError> {
         let checked_expression = self.typecheck_expression(expression, scope_id)?;
         let type_id = self.get_expression_type_id(&checked_expression, scope_id)?;
+
+        if is_referenced && type_id < PTR_TYPE_ID {
+            return Err(TypeError::MismatchedTypes(
+                self.lookup_type_name(type_id).unwrap(),
+                "Struct".into(),
+            )); 
+        }
 
         if type_id == VOID_TYPE_ID {
             return Err(TypeError::VoidAssignment); 
@@ -603,13 +606,14 @@ impl Project {
             name.clone(), 
             type_id, 
             scope_id,
-            checked_expression
+            checked_expression,
         );
 
         let checked_variable = CheckedVariable::new(
             name.clone(),
             type_id,
             scope_id,
+            is_referenced,
         );
 
         self.add_variable_to_scope(checked_variable.clone(), scope_id);
@@ -621,8 +625,8 @@ impl Project {
         statements: Vec<Statement>,
         scope_id: ScopeId,
     ) -> Result<CheckedBlock, TypeError> {
-        let mut checked_block = CheckedBlock::new();
         let block_scope_id = self.create_scope(scope_id);
+        let mut checked_block = CheckedBlock::new(block_scope_id);
 
         for statement in statements.iter() {
             let checked_statement = self.typecheck_statement(statement, block_scope_id)?; 
@@ -638,11 +642,11 @@ impl Project {
         parameters: &Vec<CheckedNamedParameter>,
         scope_id: ScopeId,
     ) -> Result<CheckedBlock, TypeError> {
-        let mut checked_block = CheckedBlock::new();
         let block_scope_id = self.create_scope(scope_id);
+        let mut checked_block = CheckedBlock::new(block_scope_id);
 
         for param in parameters.iter() {
-            let var = CheckedVariable::new(param.name.clone(), param.type_id, scope_id);
+            let var = CheckedVariable::new(param.name.clone(), param.type_id, scope_id, false);
             self.add_variable_to_scope(var, block_scope_id);
         }
 

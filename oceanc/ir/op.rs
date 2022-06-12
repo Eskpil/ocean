@@ -1,9 +1,10 @@
 use crate::ast::{BinaryOp};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Type {
     Ptr,
     Num,
+    Reference,
     Object,
 }
 
@@ -20,6 +21,7 @@ pub enum OpKind {
 
     NewStruct,
     SetField,
+    Deref,
 
     ResolveVariable,
     NewVariable,

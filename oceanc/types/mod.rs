@@ -11,6 +11,7 @@ pub const VOID_TYPE_ID: TypeId = 0;
 pub const INT_TYPE_ID: TypeId = 1;
 pub const BOOL_TYPE_ID: TypeId = 2;
 pub const STRING_TYPE_ID: TypeId = 3;
+pub const PTR_TYPE_ID: TypeId = 4;
 
 pub type DefinitionResult = Result<CheckedDefinition, TypeError>;
 pub type StatementResult = Result<CheckedStatement, TypeError>;
@@ -88,6 +89,7 @@ pub struct CheckedBinaryExpression {
 #[derive(Debug, Clone)]
 pub struct CheckedBlock {
     pub children: Vec<CheckedStatement>,
+    pub scope_id: ScopeId,
 }
 
 #[derive(Debug, Clone)]
@@ -103,6 +105,8 @@ pub struct CheckedVariable {
     pub name: String,    
     pub type_id: TypeId,
     pub scope_id: ScopeId,
+
+    pub is_referenced: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -240,12 +244,14 @@ impl CheckedVariable {
     pub fn new(
         name: String, 
         type_id: TypeId, 
-        scope_id: ScopeId
+        scope_id: ScopeId,
+        is_referenced: bool
     ) -> Self {
         Self {
             name,
             type_id,
             scope_id,
+            is_referenced,
         }
     }    
 }
@@ -293,9 +299,10 @@ impl CheckedReturn {
 }
 
 impl CheckedBlock {
-    pub fn new() -> Self {
+    pub fn new(scope_id: ScopeId) -> Self {
         Self {
             children: vec![],
+            scope_id,
         }
     }
 }

@@ -25,6 +25,8 @@ pub enum TokenKind {
     Sub,
     Div,
     Mul,
+    Dot,
+    Ampersand,
 
     Greater,
     GreaterEquals,
@@ -100,6 +102,8 @@ impl TokenKind {
             TokenKind::Sub => "-".into(),
             TokenKind::Div => "/".into(),
             TokenKind::Mul => "*".into(),
+            TokenKind::Dot => ".".into(),
+            TokenKind::Ampersand => "&".into(),
 
             TokenKind::Greater => ">".into(),
             TokenKind::GreaterEquals => ">=".into(),
@@ -319,6 +323,16 @@ impl Iterator for Lexer {
                 self.col = 0;
                 self.advance();
                 self.next()            
+            }
+            '&' => {
+                let token = Token::kind_loc(TokenKind::Ampersand, self.row, self.col);
+                self.advance();
+                Some(token)
+            }
+            '.' => {
+                let token = Token::kind_loc(TokenKind::Dot, self.row, self.col);
+                self.advance();
+                Some(token)
             }
             ',' => {
                 let token = Token::kind_loc(TokenKind::Comma, self.row, self.col);

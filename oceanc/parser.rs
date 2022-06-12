@@ -358,13 +358,19 @@ impl Parser {
         self.consume(TokenKind::Let)?;
         let ident = self.next_token().unwrap().value.clone();
         let mut expr = Expression::Empty;
+        let mut is_referenced = false;
 
         if self.at(TokenKind::Assignment) {
             self.consume(TokenKind::Assignment)?;
+
+            if self.peek() == TokenKind::Ampersand {
+               self.consume(TokenKind::Ampersand); 
+               is_referenced = true;
+            }
             expr = self.parse_expression(0, None)?;
         }
 
-        return Ok(Statement::Declaration(ident, expr));
+        return Ok(Statement::Declaration(ident, expr, is_referenced));
     }
 
     pub fn parse_if_statement(&mut self) -> ParseResult<Statement> {
