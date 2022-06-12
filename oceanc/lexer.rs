@@ -43,7 +43,6 @@ pub enum TokenKind {
 
     True,
     False,
-    Bool,
 
     LeftParen,
     RightParen,
@@ -119,7 +118,6 @@ impl TokenKind {
 
             TokenKind::True => "true".into(),
             TokenKind::False => "false".into(),
-            TokenKind::Bool => "bool".into(),
 
             TokenKind::RightParen => ")".into(),
             TokenKind::LeftParen => "(".into(),
@@ -184,7 +182,6 @@ impl Lexer {
         keywords.insert("if".into(), TokenKind::If);
         keywords.insert("else".into(), TokenKind::Else);
         keywords.insert("struct".into(), TokenKind::Struct);
-        keywords.insert("bool".into(), TokenKind::Bool);
         keywords.insert("fn".into(), TokenKind::Function);
         keywords.insert("return".into(), TokenKind::Return);
 
