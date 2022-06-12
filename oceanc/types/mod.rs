@@ -40,6 +40,7 @@ pub struct CheckedField {
 pub struct CheckedFunctionCall {
     pub name: String,
     pub arguments: Vec<CheckedNamedArgument>,
+    pub returning: TypeId,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +55,11 @@ pub struct CheckedIfStatement {
     pub cond: CheckedExpression, 
     pub if_block: CheckedBlock,
     pub else_block: Option<CheckedBlock>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CheckedReturn {
+    pub expr: CheckedExpression,
 }
 
 #[derive(Debug, Clone)]
@@ -122,6 +128,7 @@ pub enum CheckedStatement {
     If(CheckedIfStatement),
     Block(CheckedBlock),
     While(CheckedWhileStatement),
+    Return(CheckedReturn),
 }
 
 impl CheckedIfStatement {
@@ -151,10 +158,15 @@ impl CheckedWhileStatement {
 }
 
 impl CheckedFunctionCall {
-    pub fn new(name: String, arguments: Vec<CheckedNamedArgument>) -> Self {
+    pub fn new(
+        name: String, 
+        arguments: Vec<CheckedNamedArgument>,
+        returning: TypeId,
+    ) -> Self {
         Self {
             name,
             arguments,
+            returning,
         }
     }
 }
@@ -239,6 +251,16 @@ impl CheckedFunction {
             block,
             returning
         }     
+    }
+}
+
+impl CheckedReturn {
+    pub fn new(
+        expr: CheckedExpression,
+    ) -> Self {
+        Self {
+            expr
+        }
     }
 }
 

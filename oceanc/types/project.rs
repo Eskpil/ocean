@@ -20,6 +20,7 @@ use super::{
     CheckedIfStatement,
     CheckedVariableDecl,
     CheckedWhileStatement,
+    CheckedReturn,
 
     VOID_TYPE_ID,
     BOOL_TYPE_ID,
@@ -55,6 +56,8 @@ pub struct Project {
     pub functions: Vec<CheckedFunction>,
     pub types: HashMap<String, TypeId>,
     pub scopes: Vec<Scope>,
+
+    pub returning: TypeId,
 }
 
 impl Project {
@@ -73,6 +76,7 @@ impl Project {
             functions: vec![],
             scopes: vec![program_scope],
             types,
+            returning: VOID_TYPE_ID,
         }
     }
 
@@ -135,13 +139,13 @@ impl Project {
 
     pub fn get_type_size(&self, type_id: TypeId) -> Result<usize, TypeError> {
         if type_id == 0 {
-            Ok(8)
+            Ok(4)
         } else if type_id == 1 {
-            Ok(8)
+            Ok(4)
         } else if type_id == 2 {
-            Ok(8)
+            Ok(4)
         } else {
-            Ok(8) 
+            Ok(4) 
         }
     }
 
@@ -236,6 +240,10 @@ impl Project {
                 )?;
 
                 CheckedStatement::While(checked_stmt)
+            }
+            Statement::Return(expr) => {
+                let stmt = self.typecheck_return(expr, scope_id)?;
+                CheckedStatement::Return(stmt)
             }
             o => todo!("Implement typechecking for {:?}", o),
         }; 
@@ -443,8 +451,30 @@ impl Project {
             }            
         }
 
-        let checked_call = CheckedFunctionCall::new(name.clone(), checked_arguments); 
+        let checked_call = CheckedFunctionCall::new(
+            name.clone(), 
+            checked_arguments, 
+            function.returning
+        ); 
         Ok(checked_call)
+    }
+
+    pub fn typecheck_return(
+        &mut self,
+        expression: &Expression,
+        scope_id: ScopeId,
+    ) -> Result<CheckedReturn, TypeError> {
+        let checked_expression = self.typecheck_expression(expression, scope_id)?;   
+        let type_id = self.get_expression_type_id(&checked_expression, scope_id)?;
+        
+        if type_id != self.returning {
+            Err(TypeError::MismatchedTypes(
+                self.lookup_type_name(type_id).unwrap(),
+                self.lookup_type_name(self.returning).unwrap(),
+            )) 
+        } else {
+            Ok(CheckedReturn::new(checked_expression))
+        }
     }
 
     pub fn typecheck_variable(
@@ -509,7 +539,10 @@ impl Project {
         }
 
         for statement in statements.iter() {
-            let checked_statement = self.typecheck_statement(statement, block_scope_id)?; 
+            let checked_statement = self.typecheck_statement(
+                statement, 
+                block_scope_id
+            )?; 
             checked_block.children.push(checked_statement);
         } 
 
@@ -558,6 +591,8 @@ impl Project {
                 }
             }
         }
+
+        self.returning = returning;
 
         let mut checked_function = CheckedFunction::new(
             name.clone(), 

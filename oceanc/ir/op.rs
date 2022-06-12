@@ -6,6 +6,7 @@ pub enum OpKind {
     Proc,
     End,
     Call,
+    Return,
 
     NewString,
     ResolveString,
@@ -26,6 +27,7 @@ pub enum OpKind {
 #[derive(Clone, Debug)]
 pub enum Operand {
     Uint(u64),
+    Bool(bool),
     Symbol(String),
     Data(String),
     Op(BinaryOp),
@@ -65,6 +67,13 @@ impl Operand {
             o => unreachable!("Expected OpKind::Op but found OpKind::{:?}", o),
         }
     }
+
+    pub fn as_bool(&self) -> bool {
+        match self {
+            Operand::Bool(d) => d.clone(),
+            o => unreachable!("Expected OpKind::Bool but found OpKind::{:?}", o),
+        }
+    }
 }
 
 impl Op {
@@ -97,6 +106,20 @@ impl Op {
         let mut operands = Vec::new();
         operands.push(one);
         operands.push(two);
+
+        Op::new(kind, operands)
+    }
+
+    pub fn tripple(
+        kind: OpKind, 
+        one: Operand, 
+        two: Operand,
+        three: Operand,
+    ) -> Self {
+        let mut operands = Vec::new();
+        operands.push(one);
+        operands.push(two);
+        operands.push(three);
 
         Op::new(kind, operands)
     }

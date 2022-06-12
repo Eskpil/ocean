@@ -14,7 +14,7 @@ set iskeyword=a-z,A-Z,-,*,_,!,@
 syntax keyword oceanTodos TODO XXX FIXME NOTE
 
 " Language keywords
-syntax keyword oceanKeywords fn struct has if else let do end while and or then 
+syntax keyword oceanKeywords fn struct has if else let while and or return
 
 " Comments
 syntax region oceanCommentLine start="//" end="$"   contains=oceanTodos

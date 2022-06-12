@@ -27,8 +27,9 @@ impl NasmBackend {
         convention.insert(4, "r8".into());
         convention.insert(5, "r9".into());
     
-        write!(file, "BITS 64\n");
+        // write!(file, "BITS 64\n");
         write!(file, "extern printf\n");
+        write!(file, "extern putc\n");
         write!(file, "segment .text\n");
         write!(file, "    global main\n");
         write!(file, "    main:\n");
@@ -223,7 +224,9 @@ impl NasmBackend {
 
                     write!(self.output, "    xor eax, eax\n");
                     write!(self.output, "    call {}\n", symbol);
-                    write!(self.output, "    push rax\n");
+                    if op.operands()[2].as_bool() {
+                        write!(self.output, "    push rax\n");
+                    }
 
                     self.current.gc_count += 1;
                 }
@@ -239,6 +242,13 @@ impl NasmBackend {
                     write!(self.output, "    pop rax\n");
                     write!(self.output, "    test rax, rax\n");
                     write!(self.output, "    jz {}\n", symbol);
+                    self.current.gc_count -= 1;
+                }
+                OpKind::Return => {
+                    write!(self.output, "    pop rax\n");
+                    write!(self.output, "    pop rbp\n");
+                    write!(self.output, "    ret\n");
+
                     self.current.gc_count -= 1;
                 }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 

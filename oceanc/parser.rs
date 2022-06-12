@@ -306,6 +306,7 @@ impl Parser {
                 TokenKind::Function, 
                 TokenKind::While,
                 TokenKind::LeftCurly,
+                TokenKind::Return,
             ]) {
                 body.push(self.parse_statement()?);  
             } else {
@@ -430,6 +431,13 @@ impl Parser {
         } 
     }
 
+    pub fn parse_return(&mut self) -> ParseResult<Statement> {
+        self.consume(TokenKind::Return)?; 
+        let expr = self.parse_expression(0, None)?;
+
+        Ok(Statement::Return(expr))
+    }
+
     pub fn parse_function(&mut self) -> ParseResult<Statement> {
         self.consume(TokenKind::Function)?; 
         let name = self.consume_next(TokenKind::Identifier)?.value.clone();
@@ -489,6 +497,7 @@ impl Parser {
             TokenKind::Function => self.parse_function(),
             TokenKind::If => self.parse_if_statement(),
             TokenKind::While => self.parse_while_loop(),
+            TokenKind::Return => self.parse_return(),
             TokenKind::Literal => {
                 let expr = self.parse_expression(0, None)?;
                 let stmt = Statement::Expression(expr);

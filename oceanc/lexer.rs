@@ -39,6 +39,7 @@ pub enum TokenKind {
 
     While,
     Arrow,
+    Return,
 
     True,
     False,
@@ -114,6 +115,7 @@ impl TokenKind {
 
             TokenKind::While => "while".into(),
             TokenKind::Arrow => "->".into(),
+            TokenKind::Return => "return".into(),
 
             TokenKind::True => "true".into(),
             TokenKind::False => "false".into(),
@@ -184,6 +186,7 @@ impl Lexer {
         keywords.insert("struct".into(), TokenKind::Struct);
         keywords.insert("bool".into(), TokenKind::Bool);
         keywords.insert("fn".into(), TokenKind::Function);
+        keywords.insert("return".into(), TokenKind::Return);
 
         Self {
             source: source.into(),

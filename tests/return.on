@@ -1,0 +1,14 @@
+fn left() -> Int {
+    return 69;
+}
+
+fn right() -> Int {
+    return 420;
+}
+
+fn program() {
+    let lhs = left();
+    let rhs = right();
+
+    let result = lhs + rhs;
+}

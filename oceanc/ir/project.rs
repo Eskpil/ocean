@@ -5,6 +5,8 @@ use crate::types::{
     TypeId,
     ScopeId,
 
+    VOID_TYPE_ID,
+
     CheckedStatement,
     CheckedBlock,
     CheckedFunction,
@@ -15,6 +17,7 @@ use crate::types::{
     CheckedFunctionCall,
     CheckedIfStatement,
     CheckedWhileStatement,
+    CheckedReturn,
 };
 
 pub fn generate_project(project: &Project, generator: &mut Generator) {
@@ -55,6 +58,8 @@ pub fn generate_statement(
             generate_if_statement(project, stmt, generator),
         CheckedStatement::While(stmt) =>
             generate_while_statement(project, stmt, generator),
+        CheckedStatement::Return(stmt) =>
+            generate_return_statement(project, stmt, generator),
         o => todo!("Implement generating of {:?} statement", o),
     }
 }
@@ -79,6 +84,15 @@ pub fn generate_while_statement(
     generator.append(Op::single(OpKind::Jump, Operand::Symbol(expression_label.clone())));
 
     generator.append(Op::single(OpKind::Block, Operand::Symbol(end_label.clone())));
+}
+
+pub fn generate_return_statement(
+    project: &Project,
+    stmt: &CheckedReturn,
+    generator: &mut Generator,
+) {
+    generate_expression(project, &stmt.expr, generator);  
+    generator.append(Op::none(OpKind::Return));
 }
 
 pub fn generate_if_statement(
@@ -205,10 +219,17 @@ pub fn generate_call_expression(
         generate_expression(project, &arg.expr, generator);
     }  
 
-    let op = Op::double(
+    let mut returning = true;
+
+    if call.returning == VOID_TYPE_ID {
+        returning = false;
+    }
+
+    let op = Op::tripple(
         OpKind::Call,
         Operand::Symbol(call.name.clone()),
         Operand::Uint(call.arguments.len() as u64),
+        Operand::Bool(returning),
     );
 
     generator.append(op);

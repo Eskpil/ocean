@@ -22,6 +22,7 @@ pub enum Statement {
     Expression(Expression),
     While(Expression, Vec<Statement>),
     Declaration(String, Expression),
+    Return(Expression),
 }
 
 impl NamedParameter {
@@ -98,6 +99,7 @@ impl Statement {
                 util::print_indent(indent + 2, name.clone());
                 expr.print(indent + 1);
             }
+            _ => {},
         } 
     }
 
@@ -204,6 +206,7 @@ impl Statement {
                 let op = Op::single(OpKind::NewVariable, Operand::Symbol(name.clone()));
                 generator.append(op);
             }
+            _ => {},
         }        
     }     
 }
