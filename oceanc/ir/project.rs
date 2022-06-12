@@ -1,11 +1,17 @@
 use crate::types::project::Project;
-use super::op::{Op, OpKind, Operand};
+use super::op::{
+    Op, 
+    OpKind, 
+    Operand,
+    Type
+};
 use super::generator::Generator;
 use crate::types::{
     TypeId,
     ScopeId,
 
     VOID_TYPE_ID,
+    STRING_TYPE_ID,
 
     CheckedStatement,
     CheckedBlock,
@@ -18,6 +24,7 @@ use crate::types::{
     CheckedIfStatement,
     CheckedWhileStatement,
     CheckedReturn,
+    CheckedStructInit,
 };
 
 pub fn generate_project(project: &Project, generator: &mut Generator) {
@@ -235,6 +242,31 @@ pub fn generate_call_expression(
     generator.append(op);
 }
 
+pub fn generate_struct_init(
+    project: &Project, 
+    init: &CheckedStructInit,
+    generator: &mut Generator,
+) {
+    generator.append(Op::single(OpKind::NewStruct, Operand::Uint(init.size as u64)));
+
+    for argument in init.arguments.iter() {
+        generate_expression(project, &argument.expr, generator);
+        let size = project.get_type_size(argument.type_id).unwrap();
+
+        let mut typ = Type::Num;
+
+        if argument.type_id == STRING_TYPE_ID {
+            typ = Type::Ptr;
+        }
+
+        generator.append(Op::double(
+                OpKind::SetField, 
+                Operand::Uint(argument.offset as u64),
+                Operand::Type(typ),
+        ));
+    }
+}
+
 pub fn generate_expression(
     project: &Project,
     expr: &CheckedExpression,
@@ -260,6 +292,8 @@ pub fn generate_expression(
         }
         CheckedExpression::Call(call) => 
             generate_call_expression(project, call, generator),
+        CheckedExpression::StructInit(init) =>
+            generate_struct_init(project, init, generator),
         CheckedExpression::Identifier(v, id) => 
             generate_variable_lookup(
                 project,

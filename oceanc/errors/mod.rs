@@ -7,6 +7,7 @@ pub enum TypeError {
     UnknownType(String),
     MismatchedTypes(String, String),
     VariableNotInScope(String),
+    StructNotInScope(String),
     FunctionNotInScope(String),
     DuplicateFunctionParameter(String),
     DuplicateFunctionCallArgument(String),

@@ -21,6 +21,7 @@ pub type ExpressionResult = Result<CheckedExpression, TypeError>;
 pub struct CheckedNamedArgument {
     pub name: String,
     pub type_id: TypeId,
+    pub offset: usize,
     pub expr: CheckedExpression,
 }
 
@@ -44,8 +45,17 @@ pub struct CheckedFunctionCall {
 }
 
 #[derive(Debug, Clone)]
+pub struct CheckedStructInit {
+    pub name: String, 
+    pub size: usize,
+    pub arguments: Vec<CheckedNamedArgument>,
+    pub returning: TypeId,
+}
+
+#[derive(Debug, Clone)]
 pub struct CheckedStruct {
     pub name: String,
+    pub size: usize,
     pub fields: Vec<CheckedField>,
     pub type_id: Option<TypeId>,
 }
@@ -111,6 +121,7 @@ pub enum CheckedExpression {
     Identifier(String, ScopeId),
     Binary(CheckedBinaryExpression),    
     Call(CheckedFunctionCall),
+    StructInit(CheckedStructInit),
     Bool(bool)
 }
 
@@ -171,6 +182,22 @@ impl CheckedFunctionCall {
     }
 }
 
+impl CheckedStructInit {
+    pub fn new(
+        name: String,
+        arguments: Vec<CheckedNamedArgument>,
+        type_id: TypeId,
+        size: usize,
+    ) -> Self {
+        Self {
+            name,
+            size,
+            arguments,
+            returning: type_id,
+        }
+    }
+}
+
 impl CheckedNamedArgument {
     pub fn new(
         name: String, 
@@ -181,6 +208,7 @@ impl CheckedNamedArgument {
             name,
             type_id,
             expr,
+            offset: 0,
         }
     }
 }
@@ -282,9 +310,14 @@ impl CheckedField {
 }
 
 impl CheckedStruct {
-    pub fn new(name: String, fields: Vec<CheckedField>) -> Self {
+    pub fn new(
+        name: String, 
+        fields: Vec<CheckedField>,
+        size: usize,
+    ) -> Self {
         Self {
             name,
+            size,
             fields,
             type_id: None,
         } 

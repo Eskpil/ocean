@@ -21,6 +21,7 @@ use super::{
     CheckedVariableDecl,
     CheckedWhileStatement,
     CheckedReturn,
+    CheckedStructInit,
 
     VOID_TYPE_ID,
     BOOL_TYPE_ID,
@@ -108,6 +109,16 @@ impl Project {
         scope.append_function(function);
     }
 
+    pub fn add_struct_to_scope(
+        &mut self, 
+        structure: CheckedStruct,
+        scope_id: ScopeId
+    ) {
+        let scope = &mut self.scopes[scope_id];
+
+        scope.append_struct(structure);
+    }
+
     pub fn find_variable(
         &self,
         name: String,
@@ -137,15 +148,35 @@ impl Project {
         Ok(function)
     }
 
+    pub fn find_struct(
+        &self,
+        name: String,
+        scope_id: ScopeId,
+    ) -> Result<CheckedStruct, TypeError> {
+        let scope = &self.scopes[scope_id];
+        let structure = scope.find_struct(name.clone())?;
+        Ok(structure)
+    } 
+
     pub fn get_type_size(&self, type_id: TypeId) -> Result<usize, TypeError> {
         if type_id == 0 {
-            Ok(4)
+            Ok(0)
         } else if type_id == 1 {
-            Ok(4)
+            Ok(8)
         } else if type_id == 2 {
-            Ok(4)
+            Ok(8)
+        } else if type_id == 3 {
+            Ok(8)
         } else {
-            Ok(4) 
+            for scope in self.scopes.iter() {
+                for structure in scope.structs.iter() {
+                    if structure.type_id.unwrap() == type_id {
+                        return Ok(structure.size);
+                    }
+                }     
+            }
+
+            Ok(8) 
         }
     }
 
@@ -154,10 +185,15 @@ impl Project {
         self.types.len()
     }
 
-    pub fn lookup_type(&self, name: String) -> Result<TypeId, TypeError> {
+    pub fn lookup_type(&self, name: String, scope_id: ScopeId) -> Result<TypeId, TypeError> {
         match self.types.get(&name) {
             Some(id) => Ok(id.clone()),
-            None => Err(TypeError::UnknownType(name))        
+            None => { 
+                match self.find_struct(name, scope_id) {
+                    Ok(s) => Ok(s.type_id.unwrap()),
+                    Err(err) => Err(err),
+                }
+            }
         }
     }
 
@@ -261,7 +297,7 @@ impl Project {
 
         let type_id = self.get_expression_type_id(&cond, scope_id)?;
 
-        if type_id != self.lookup_type("Bool".into())? {
+        if type_id != self.lookup_type("Bool".into(), scope_id)? {
             todo!("Error messages for expressions not returning boolean");  
         }
 
@@ -281,7 +317,7 @@ impl Project {
 
         let type_id = self.get_expression_type_id(&cond, scope_id)?;
 
-        if type_id != self.lookup_type("Bool".into())? {
+        if type_id != self.lookup_type("Bool".into(), scope_id)? {
             todo!("Error messages for expressions not returning boolean");  
         }
 
@@ -303,20 +339,21 @@ impl Project {
         scope_id: ScopeId,
     ) -> Result<TypeId, TypeError> {
         match expr {
-            CheckedExpression::Literal(_) => self.lookup_type("Int".to_string()),
-            CheckedExpression::StringLiteral(_) => self.lookup_type("String".to_string()),
+            CheckedExpression::Literal(_) => self.lookup_type("Int".to_string(), scope_id),
+            CheckedExpression::StringLiteral(_) => self.lookup_type("String".to_string(), scope_id),
             CheckedExpression::Identifier(name, scope) => {
                 let var = self.find_variable(name.clone(), *scope)?;
                 Ok(var.type_id)
             },
             CheckedExpression::Binary(expr) => {
                 if expr.op.returns_bool() {
-                    self.lookup_type("Bool".to_string())
+                    self.lookup_type("Bool".to_string(), scope_id)
                 } else { 
-                    self.lookup_type("Int".to_string())
+                    self.lookup_type("Int".to_string(), scope_id)
                 }
             }
-            CheckedExpression::Bool(_) => self.lookup_type("Bool".to_string()),
+            CheckedExpression::StructInit(init) => Ok(init.returning),
+            CheckedExpression::Bool(_) => self.lookup_type("Bool".to_string(), scope_id),
             CheckedExpression::Call(call) => {
                 let function = self.find_function(call.name.clone(), scope_id)?;
 
@@ -381,11 +418,82 @@ impl Project {
                 let expr = self.typecheck_binary_expression(&*lhs, &*rhs, op, scope_id)?;
                 CheckedExpression::Binary(expr)
             }
+            Expression::StructInit(name, arguments) => {
+                let expr = self.typecheck_struct_init(name.clone(), arguments.clone(), scope_id)?;
+                CheckedExpression::StructInit(expr)
+            }
             Expression::Bool(v) => CheckedExpression::Bool(v.clone()),
             o => unreachable!("Implement typechecking for expression: {:?}", o)
         };
 
         Ok(expr)
+    }
+
+    pub fn typecheck_struct_init(
+        &mut self,
+        name: String,
+        args: Vec<NamedArgument>,
+        scope_id: ScopeId,
+    ) -> Result<CheckedStructInit, TypeError> {
+        let type_id = self.lookup_type(name.clone(), scope_id)?;
+        let mut checked_arguments = Vec::<CheckedNamedArgument>::new();
+
+        for argument in args.iter() {
+            match checked_arguments.iter().find(
+                |&x| x.name == argument.name.clone()
+            ) {
+                Some(checked) => {
+                    return Err(TypeError::DuplicateFunctionCallArgument(argument.name.clone()));
+                }
+                None => {
+                    let checked_argument = self.typecheck_named_argument(
+                        argument, 
+                        scope_id
+                    )?;
+                    checked_arguments.push(checked_argument);        
+                }
+            } 
+        }
+
+        let structure = self.find_struct(name.clone(), scope_id)?;
+
+        if checked_arguments.len() > structure.fields.len() {
+            return Err(TypeError::ExhaustiveFunctionCallArguments(
+                    structure.fields.len(), 
+                    checked_arguments
+            ));
+        } 
+
+        let mut offset = 0;
+
+        for argument in checked_arguments.iter_mut() {
+            match structure.fields.iter().find(
+                |&x| x.name == argument.name.clone()
+            ) {
+                Some(field) => {
+                    if field.type_id != argument.type_id {
+                        return Err(TypeError::MismatchedTypes(
+                            self.lookup_type_name(field.type_id).unwrap(),
+                            self.lookup_type_name(argument.type_id).unwrap(),
+                        ))        
+                    } 
+
+                    argument.offset = offset;
+                    offset += self.get_type_size(field.type_id)?;
+                }  
+                None => {
+                    return Err(TypeError::UnknownFunctionArgument(argument.name.clone())); 
+                }
+            }            
+        }
+
+        let checked_init = CheckedStructInit::new(
+            name.clone(), 
+            checked_arguments, 
+            type_id,
+            structure.size,
+        ); 
+        Ok(checked_init)
     }
     
     pub fn typecheck_named_argument(
@@ -555,7 +663,7 @@ impl Project {
         scope_id: ScopeId,
     ) -> Result<CheckedNamedParameter, TypeError> {
         let name = parameter.name.clone(); 
-        let type_id = self.lookup_type(parameter.defined_type.to_name())?;
+        let type_id = self.lookup_type(parameter.defined_type.to_name(), scope_id)?;
         Ok(CheckedNamedParameter::new(name, type_id))
     }
 
@@ -571,7 +679,7 @@ impl Project {
         let mut returning: TypeId = VOID_TYPE_ID;
 
         if let DefinedType::Name(name) = defined_type.clone() {
-            let type_id = self.lookup_type(name.clone())?;
+            let type_id = self.lookup_type(name.clone(), scope_id)?;
             returning = type_id; 
         } 
 
@@ -627,15 +735,24 @@ impl Project {
         let def = match definition {
             Definition::Struct(structure) => {
                 let mut fields = Vec::<CheckedField>::new(); 
+                let mut size = 0;
 
                 for unchecked_field in structure.fields.iter() {
-                    let id = self.lookup_type(unchecked_field.defined_type.to_name())?;
+                    let id = self.lookup_type(unchecked_field.defined_type.to_name(), scope_id)?;
+                    size += self.get_type_size(id)?;
                     let checked_field = CheckedField::new(unchecked_field.name.clone(), id);  
+                    fields.push(checked_field);
                 }
-                
-                let mut checked_struct = CheckedStruct::new(structure.name.clone(), fields);
+
+                let mut checked_struct = CheckedStruct::new(
+                    structure.name.clone(), 
+                    fields, 
+                    size
+                );
                 let type_id = self.allocate_type(checked_struct.name.clone());
                 checked_struct.type_id = Some(type_id);
+
+                self.add_struct_to_scope(checked_struct.clone(), scope_id);
 
                 CheckedDefinition::Struct(checked_struct)
             } 

@@ -1,6 +1,13 @@
 use crate::ast::{BinaryOp};
 
 #[derive(Clone, Debug)]
+pub enum Type {
+    Ptr,
+    Num,
+    Object,
+}
+
+#[derive(Clone, Debug)]
 pub enum OpKind {
     Block,
     Proc,
@@ -12,6 +19,7 @@ pub enum OpKind {
     ResolveString,
 
     NewStruct,
+    SetField,
 
     ResolveVariable,
     NewVariable,
@@ -31,6 +39,7 @@ pub enum Operand {
     Symbol(String),
     Data(String),
     Op(BinaryOp),
+    Type(Type),
 }
 
 #[derive(Clone, Debug)]
@@ -72,6 +81,13 @@ impl Operand {
         match self {
             Operand::Bool(d) => d.clone(),
             o => unreachable!("Expected OpKind::Bool but found OpKind::{:?}", o),
+        }
+    }
+
+    pub fn as_type(&self) -> Type {
+        match self {
+            Operand::Type(t) => t.clone(),
+            o => unreachable!("Expected OpKind::Type but found OpKind::{:?}", o),
         }
     }
 }
