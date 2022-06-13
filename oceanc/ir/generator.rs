@@ -3,6 +3,7 @@ use super::op::{Op};
 pub struct Generator {
     ops: Vec<Op>,
     label_count: usize,
+    externals: Vec<String>,
 }
 
 impl Generator {
@@ -11,8 +12,13 @@ impl Generator {
 
         Self {
             ops,
+            externals: vec![],
             label_count: 0,
         }
+    }
+
+    pub fn add_external(&mut self, name: String) {
+        self.externals.push(name);
     }
 
     pub fn allocate_label(&mut self) -> String {
@@ -25,8 +31,12 @@ impl Generator {
         self.ops.push(op);
     }
 
-    pub fn eject(&mut self) -> Vec<Op> {
+    pub fn eject_ops(&mut self) -> Vec<Op> {
         self.ops.clone()
+    }
+
+    pub fn eject_externals(&mut self) -> Vec<String> {
+        self.externals.clone()
     }
 }
 

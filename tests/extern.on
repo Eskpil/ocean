@@ -1,0 +1,5 @@
+extern fn printf(message: String);
+
+fn program() {
+    printf(message: "Hello, World\n");
+}

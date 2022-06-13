@@ -242,12 +242,19 @@ impl Project {
 
                 CheckedStatement::Define
             },
-            Statement::Function(name, parameters, children, defined) => {
+            Statement::Function(
+                name, 
+                parameters, 
+                children, 
+                defined, 
+                external
+            ) => {
                 let function = self.typecheck_function(
                     name.clone(), 
                     &parameters, 
                     children.clone(), 
                     defined,
+                    external,
                     scope_id
                 )?;
                 self.functions.push(function.clone());
@@ -723,6 +730,7 @@ impl Project {
         parameters: &Vec<NamedParameter>,
         children: Vec<Statement>,
         defined_type: &DefinedType,
+        external: &bool,
         scope_id: ScopeId,
     ) -> Result<CheckedFunction, TypeError> {
         let mut checked_parameters = Vec::<CheckedNamedParameter>::new();
@@ -757,6 +765,7 @@ impl Project {
             checked_parameters.clone(),
             None,
             returning,
+            *external,
         );
         if children.len() > 0 {
             let checked_block = self.typecheck_function_block(
@@ -769,6 +778,7 @@ impl Project {
                 checked_parameters.clone(),
                 Some(checked_block),
                 returning,
+                *external,
             );
         }
 

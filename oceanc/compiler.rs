@@ -58,11 +58,14 @@ impl Compiler {
         &mut self,
     ) {
         generate_project(&self.project, &mut self.generator);
-        let ops = self.generator.eject();
+        let ops = self.generator.eject_ops();
+        let externals = self.generator.eject_externals();
 
         let mut backend = NasmBackend::new(
             format!("{}.asm", self.output).to_string()
         );
+
+        backend.generate_header(externals);
 
         backend.generate_ops(ops);
         backend.finish();

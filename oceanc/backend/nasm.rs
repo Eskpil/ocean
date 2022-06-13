@@ -11,6 +11,8 @@ pub struct NasmBackend {
     current: BackendScope,
     output: File,
 
+    externals: Vec<String>,
+
     convention: HashMap<u64, String>,
 }
 
@@ -26,43 +28,51 @@ impl NasmBackend {
         convention.insert(3, "rcx".into());
         convention.insert(4, "r8".into());
         convention.insert(5, "r9".into());
-    
-        write!(file, "BITS 64\n");
 
-        write!(file, "extern printf\n");
-        write!(file, "extern gpa_allocate_sized\n");
-        write!(file, "extern gpa_allocate_counted\n");
-
-        write!(file, "extern gpa_memory_free\n");
-        write!(file, "extern gpa_memory_ref_inc\n");
-        write!(file, "extern gpa_memory_ref_dec\n");
-
-        write!(file, "extern gpa_memory_set_object_field\n");
-        write!(file, "extern gpa_memory_set_num_field\n");
-        write!(file, "extern gpa_memory_set_ptr_field\n");
-
-        write!(file, "extern gpa_memory_get_object_field\n");
-        write!(file, "extern gpa_memory_get_num_field\n");
-        write!(file, "extern gpa_memory_get_ptr_field\n");
-
-        write!(file, "segment .text\n");
-        write!(file, "    global main\n");
-        write!(file, "    main:\n");
-        write!(file, "    push rbp\n");
-        write!(file, "    mov rbp, rsp\n");
-        write!(file, "    mov rax, 0\n");
-        write!(file, "    call program\n");
-        write!(file, "    mov rax, 0\n");
-        write!(file, "    pop rbp\n");
-        write!(file, "    ret\n");
-
-        Self {
+        let mut backend = Self {
             scopes: vec![],
+            externals: vec![],
             output: file,
             convention,
             current: BackendScope::new("main".to_string()),
-        }
+        };
+
+        backend
     }    
+
+    pub fn generate_header(&mut self, externals: Vec<String>) {
+        write!(self.output, "BITS 64\n");
+
+        for external in externals.iter() {
+            write!(self.output, "extern {external}\n");
+        }
+
+        write!(self.output, "extern gpa_allocate_sized\n");
+        write!(self.output, "extern gpa_allocate_counted\n");
+
+        write!(self.output, "extern gpa_memory_free\n");
+        write!(self.output, "extern gpa_memory_ref_inc\n");
+        write!(self.output, "extern gpa_memory_ref_dec\n");
+
+        write!(self.output, "extern gpa_memory_set_object_field\n");
+        write!(self.output, "extern gpa_memory_set_num_field\n");
+        write!(self.output, "extern gpa_memory_set_ptr_field\n");
+
+        write!(self.output, "extern gpa_memory_get_object_field\n");
+        write!(self.output, "extern gpa_memory_get_num_field\n");
+        write!(self.output, "extern gpa_memory_get_ptr_field\n");
+
+        write!(self.output, "segment .text\n");
+        write!(self.output, "    global main\n");
+        write!(self.output, "    main:\n");
+        write!(self.output, "    push rbp\n");
+        write!(self.output, "    mov rbp, rsp\n");
+        write!(self.output, "    mov rax, 0\n");
+        write!(self.output, "    call program\n");
+        write!(self.output, "    mov rax, 0\n");
+        write!(self.output, "    pop rbp\n");
+        write!(self.output, "    ret\n");
+    }
 
     pub fn new_scope(&mut self, name: String) {
         self.scopes.push(self.current.clone());

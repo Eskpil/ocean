@@ -317,6 +317,7 @@ impl Parser {
                 TokenKind::While,
                 TokenKind::LeftCurly,
                 TokenKind::Return,
+                TokenKind::Extern,
             ]) {
                 body.push(self.parse_statement()?);  
             } else {
@@ -454,7 +455,7 @@ impl Parser {
         Ok(Statement::Return(expr))
     }
 
-    pub fn parse_function(&mut self) -> ParseResult<Statement> {
+    pub fn parse_function(&mut self, external: bool) -> ParseResult<Statement> {
         self.consume(TokenKind::Function)?; 
         let name = self.consume_next(TokenKind::Identifier)?.value.clone();
         let mut parameters = Vec::<NamedParameter>::new();
@@ -498,7 +499,8 @@ impl Parser {
             name, 
             parameters, 
             body, 
-            DefinedType::name(type_name)
+            DefinedType::name(type_name),
+            external
         );
 
         Ok(function)
@@ -510,10 +512,14 @@ impl Parser {
             TokenKind::Let => self.parse_let_statement(),
             TokenKind::LeftCurly => self.parse_block(),
             TokenKind::Struct => self.parse_definition(),
-            TokenKind::Function => self.parse_function(),
+            TokenKind::Function => self.parse_function(false),
             TokenKind::If => self.parse_if_statement(),
             TokenKind::While => self.parse_while_loop(),
             TokenKind::Return => self.parse_return(),
+            TokenKind::Extern => {
+                self.consume(TokenKind::Extern);
+                self.parse_function(true)
+            }
             TokenKind::Literal => {
                 let expr = self.parse_expression(0, None)?;
                 let stmt = Statement::Expression(expr);

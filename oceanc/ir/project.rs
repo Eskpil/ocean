@@ -423,5 +423,9 @@ pub fn generate_function(
         generate_block(project, block, generator);
 
         generator.append(Op::none(OpKind::End));
+    } else {
+        if function.external {
+            generator.add_external(function.name.clone());
+        }    
     }
 }

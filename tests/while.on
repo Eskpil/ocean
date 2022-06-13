@@ -1,4 +1,4 @@
-fn printf(message: String);
+extern fn printf(message: String);
 
 fn program() {
     while true { 

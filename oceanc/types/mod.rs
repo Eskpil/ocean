@@ -103,6 +103,7 @@ pub struct CheckedBlock {
 #[derive(Debug, Clone)]
 pub struct CheckedFunction {
     pub name: String, 
+    pub external: bool,
     pub block: Option<CheckedBlock>,
     pub parameters: Vec<CheckedNamedParameter>,
     pub returning: TypeId,
@@ -287,12 +288,14 @@ impl CheckedFunction {
         parameters: Vec<CheckedNamedParameter>,
         block: Option<CheckedBlock>,
         returning: TypeId,
+        external: bool,
     ) -> Self {
         Self {
             name,
             parameters,
             block,
-            returning
+            returning,
+            external,
         }     
     }
 }

@@ -17,6 +17,7 @@ pub enum TokenKind {
     Function,
     Struct,
     Colon,
+    Extern,
 
     If,
     Else,
@@ -88,6 +89,7 @@ impl TokenKind {
             TokenKind::Percent => "%".into(),
             TokenKind::Semicolon => ";".into(),
             TokenKind::Comma => ",".into(),
+            TokenKind::Extern => ",".into(),
 
             TokenKind::Assignment => "assignment".into(),
             TokenKind::Let => "let".into(),
@@ -188,6 +190,7 @@ impl Lexer {
         keywords.insert("struct".into(), TokenKind::Struct);
         keywords.insert("fn".into(), TokenKind::Function);
         keywords.insert("return".into(), TokenKind::Return);
+        keywords.insert("extern".into(), TokenKind::Extern);
 
         Self {
             source: source.into(),
