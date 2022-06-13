@@ -23,6 +23,7 @@ pub enum Expression {
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
     Unary(BinaryOp, Box<Expression>),
     Call(String, Vec<NamedArgument>),
+    Lookup(String, String),
 }
 
 impl NamedArgument {
@@ -106,6 +107,13 @@ impl Expression {
                     arg.print(indent + 2);
                 }
             }
+            Expression::Lookup(on, field) => {
+                util::print_indent(indent, "LookupExpression:".into());
+                util::print_indent(indent + 1, "Struct:".into());
+                util::print_indent(indent + 2, on);
+                util::print_indent(indent + 1, "Field:".into());
+                util::print_indent(indent + 2, field);
+            }
         }    
     }
 
@@ -160,6 +168,7 @@ impl Expression {
                 );
                 generator.append(op);
             }
+            _ => {}
         }
     }
 }

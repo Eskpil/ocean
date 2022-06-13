@@ -28,15 +28,23 @@ impl NasmBackend {
         convention.insert(5, "r9".into());
     
         write!(file, "BITS 64\n");
+
         write!(file, "extern printf\n");
         write!(file, "extern gpa_allocate_sized\n");
+        write!(file, "extern gpa_allocate_counted\n");
+
         write!(file, "extern gpa_memory_free\n");
         write!(file, "extern gpa_memory_ref_inc\n");
         write!(file, "extern gpa_memory_ref_dec\n");
-        write!(file, "extern gpa_allocate_counted\n");
+
         write!(file, "extern gpa_memory_set_object_field\n");
         write!(file, "extern gpa_memory_set_num_field\n");
         write!(file, "extern gpa_memory_set_ptr_field\n");
+
+        write!(file, "extern gpa_memory_get_object_field\n");
+        write!(file, "extern gpa_memory_get_num_field\n");
+        write!(file, "extern gpa_memory_get_ptr_field\n");
+
         write!(file, "segment .text\n");
         write!(file, "    global main\n");
         write!(file, "    main:\n");
@@ -275,37 +283,21 @@ impl NasmBackend {
                     let offset = op.operands()[0].as_uint();  
                     let typ = op.operands()[1].as_type();
 
-                    // write!(self.output, "    pop {}\n", self.convention.get(&2).unwrap());
-                    // write!(self.output, "    pop rax\n");
-                    // write!(self.output, "    mov rax, {}\n", self.convention.get(&0).unwrap());
-                    // write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), offset);
-                    
-                    // Data
                     write!(self.output, "    pop rax\n");
-
-                    // Memory
                     write!(self.output, "    pop r12\n");
-
-                    write!(self.output, "    mov {}, r12\n", self.convention.get(&0).unwrap());
-                    write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), offset);
-                    write!(self.output, "    mov {}, rax\n", self.convention.get(&2).unwrap());
-
-                    match typ {
-                        Type::Num => {
-                            write!(self.output, "    call gpa_memory_set_num_field\n");
-                        }                        
-                        Type::Ptr => {
-                            write!(self.output, "    call gpa_memory_set_ptr_field\n");
-                        }
-                        Type::Reference |
-                        Type::Object => {
-                            write!(self.output, "    call gpa_memory_set_object_field\n");
-                        }
-                    }
-
+                    write!(self.output, "    mov [r12 + {}], rax\n", offset);
                     write!(self.output, "    push r12\n");
 
                     self.current.gc_count -= 1;
+                }
+                OpKind::ResolveField => {
+                    write!(self.output, "    ; -- ResolveField --\n");
+                    let offset = op.operands()[0].as_uint();
+                    let typ = op.operands()[1].as_type();
+
+                    write!(self.output, "    pop r12\n");
+                    write!(self.output, "    mov rax, [r12 + {}]\n", offset);
+                    write!(self.output, "    push rax\n");
                 }
                 OpKind::NewStruct => {
                     let size = op.operands()[0].as_uint();

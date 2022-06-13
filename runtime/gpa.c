@@ -13,8 +13,6 @@ extern void *gpa_allocate_sized(size_t size) {
 extern void *gpa_allocate_counted(size_t size) {
     struct mem_header *memory = malloc(size + sizeof(struct mem_header));     
 
-    printf("[INFO]: Allocated counted memory: %p\n", (const void *) memory);
-
     if (!memory) return NULL;
 	memory->count = 1;
 	memory->check = (intptr_t)(memory + 1) & 0xFFFFFFFF;
@@ -22,15 +20,12 @@ extern void *gpa_allocate_counted(size_t size) {
 }
 
 extern void gpa_memory_free(void *memory) {
-    printf("[INFO]: Freeing memory: %p\n", (const void *) memory);
     free(memory);
 }
 
 extern void gpa_memory_ref_inc(
     void *memory        
 ) {
-    printf("[INFO]: Increment reference on: %p\n", (const void *) memory);
-
     struct mem_header* const header = memory - sizeof(struct mem_header);
 
 	if (header->check != ((intptr_t)memory & 0xFFFFFFFF)) {
@@ -44,7 +39,6 @@ extern void gpa_memory_ref_inc(
 extern void gpa_memory_ref_dec(
     void *memory        
 ) {
-    printf("[INFO]: Decrement reference on: %p\n", (const void *) memory);
     struct mem_header* const header = memory - sizeof(struct mem_header);
 
 	if (header->check != ((intptr_t)memory & 0xFFFFFFFF)) {
@@ -60,11 +54,9 @@ extern void gpa_memory_ref_dec(
 
 extern void gpa_memory_set_object_field(
     void *memory,
-    u8 offset,
+    U8 offset,
     void *data
 ) {
-    printf("[INFO]: Set object field: %p\n", (const void *)data);
-
     struct mem_header* const header = memory - sizeof(struct mem_header);
 
 	if (header->check != ((intptr_t)memory & 0xFFFFFFFF)) {
@@ -73,42 +65,81 @@ extern void gpa_memory_set_object_field(
 
     gpa_memory_ref_inc(data);
 
-    void *location = (void *)(memory - offset);
+    void *location = (void *)(memory + offset);
     location = data;
 }
 
 extern void gpa_memory_set_num_field(
     void *memory, 
-    u8 offset,
-    u8 data 
+    U8 offset,
+    U8 data 
 ) {
-    printf("[INFO]: Memory: %p\n", (const void *) memory);
-    printf("[INFO]: Set num field: %lld\n", data);
-
     struct mem_header* const header = memory - sizeof(struct mem_header);
 
 	if (header->check != ((intptr_t)memory & 0xFFFFFFFF)) {
         abort();
     }
 
-    u8 *location = (u8 *)(memory - offset);
-    location = data;
+    U8 *location = (U8 *)(memory + offset);
+    location = &data;
 }
 
 extern void gpa_memory_set_ptr_field(
     void *memory, 
-    u8 offset, 
+    U8 offset, 
     void *data
 ) {
-    printf("[INFO]: Memory: %p\n", (const void *)memory);
-    printf("[INFO]: Set ptr field: %p\n", (const void *)data);
-
     struct mem_header* const header = memory - sizeof(struct mem_header);
 
 	if (header->check != ((intptr_t)memory & 0xFFFFFFFF)) {
         abort();
     }
 
-    void *location = (void *)(memory - offset);
+    void *location = (void *)(memory + offset);
     location = data;
+}
+
+extern void *gpa_memory_get_object_field(
+    void *memory,
+    U8 offset
+) {
+    struct mem_header* const header = memory - sizeof(struct mem_header);
+
+	if (header->check != ((intptr_t)memory & 0xFFFFFFFF)) {
+        abort();
+    }
+
+    void *location = (void *)(memory + offset);
+    return location;
+}
+
+extern U8 gpa_memory_get_num_field(
+    void *memory, 
+    U8 offset
+) {
+    struct mem_header* const header = memory - sizeof(struct mem_header);
+
+	if (header->check != ((intptr_t)memory & 0xFFFFFFFF)) {
+        abort();
+    }
+
+    U8 location = (U8)(memory + offset);
+    return location;
+}
+
+extern void *gpa_memory_get_ptr_field(
+    void *memory, 
+    U8 offset
+) {
+    struct mem_header* const header = memory - sizeof(struct mem_header);
+
+	if (header->check != ((intptr_t)memory & 0xFFFFFFFF)) {
+        abort();
+    }
+
+    void *location = (void *)(memory + offset);
+
+    printf("[INFO]: Location: %p\n", (const void *)location);
+
+    return location;
 }

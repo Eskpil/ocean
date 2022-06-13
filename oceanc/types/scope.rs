@@ -2,6 +2,7 @@ use super::{
     CheckedFunction, 
     CheckedVariable, 
     ScopeId,
+    TypeId,
     CheckedStruct,
 };
 use crate::errors::{TypeError};
@@ -65,6 +66,16 @@ impl Scope {
         match self.structs.iter().find(|&x| x.name == name.clone()) {
             Some(structure) => Ok(structure.clone()),
             None => Err(TypeError::StructNotInScope(name.clone())),
+        }
+    }
+
+    pub fn find_struct_by_id(
+        &self,
+        id: TypeId,
+    ) -> Result<CheckedStruct, TypeError> {
+        match self.structs.iter().find(|&x| x.type_id.unwrap() == id) {
+            Some(structure) => Ok(structure.clone()),
+            None => todo!("Error when looking up by type_id"),
         }
     }
 

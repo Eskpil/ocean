@@ -22,6 +22,7 @@ use super::{
     CheckedWhileStatement,
     CheckedReturn,
     CheckedStructInit,
+    CheckedLookup,
 
     VOID_TYPE_ID,
     BOOL_TYPE_ID,
@@ -159,6 +160,16 @@ impl Project {
         let structure = scope.find_struct(name.clone())?;
         Ok(structure)
     } 
+
+    pub fn find_struct_by_id(
+        &self,
+        id: TypeId,
+        scope_id: ScopeId,
+    ) -> Result<CheckedStruct, TypeError> {
+        let scope = &self.scopes[scope_id];
+        let structure = scope.find_struct_by_id(id)?;
+        Ok(structure)
+    }
 
     pub fn get_type_size(&self, type_id: TypeId) -> Result<usize, TypeError> {
         if type_id == 0 {
@@ -347,6 +358,7 @@ impl Project {
                     self.lookup_type("Int".to_string(), scope_id)
                 }
             }
+            CheckedExpression::Lookup(expr) => Ok(expr.type_id),
             CheckedExpression::StructInit(init) => Ok(init.returning),
             CheckedExpression::Bool(_) => self.lookup_type("Bool".to_string(), scope_id),
             CheckedExpression::Call(call) => {
@@ -418,10 +430,43 @@ impl Project {
                 CheckedExpression::StructInit(expr)
             }
             Expression::Bool(v) => CheckedExpression::Bool(v.clone()),
+            Expression::Lookup(lhs, rhs) => {
+                let expr = self.typecheck_lookup(lhs.clone(), rhs.clone(), scope_id)?;
+                CheckedExpression::Lookup(expr)
+            }
             o => unreachable!("Implement typechecking for expression: {:?}", o)
         };
 
         Ok(expr)
+    }
+    
+    pub fn typecheck_lookup(
+        &mut self,
+        lhs: String,
+        rhs: String,
+        scope_id: ScopeId,
+    ) -> Result<CheckedLookup, TypeError> {
+        let var = self.find_variable(lhs.clone(), scope_id)?;
+        let structure = self.find_struct_by_id(var.type_id, scope_id)?;
+        let mut type_id = VOID_TYPE_ID;
+        let mut pair = false;
+        let mut offset = 0;
+
+        for field in structure.fields.iter() {
+            if field.name == rhs {
+                type_id = field.type_id;
+                pair = true;
+                break;
+            } else {
+                offset += self.get_type_size(field.type_id).unwrap();
+            }
+        }
+
+        if pair {
+            Ok(CheckedLookup::new(var.clone(), rhs, type_id, offset))
+        } else {
+            todo!("Errors for non pairs.");
+        }
     }
 
     pub fn typecheck_struct_init(
@@ -588,6 +633,7 @@ impl Project {
         scope_id: ScopeId,
     ) -> Result<CheckedVariableDecl, TypeError> {
         let checked_expression = self.typecheck_expression(expression, scope_id)?;
+
         let type_id = self.get_expression_type_id(&checked_expression, scope_id)?;
 
         if is_referenced && type_id < PTR_TYPE_ID {

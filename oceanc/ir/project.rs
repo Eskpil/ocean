@@ -28,6 +28,7 @@ use crate::types::{
     CheckedWhileStatement,
     CheckedReturn,
     CheckedStructInit,
+    CheckedLookup,
 };
 
 pub fn generate_project(project: &Project, generator: &mut Generator) {
@@ -343,8 +344,52 @@ pub fn generate_expression(
                 *id,
                 generator,
             ),
+        CheckedExpression::Lookup(expr) =>
+            generate_lookup(project, expr, generator),
         o => todo!("Implement expression: {:?}", o),
     }
+}
+
+pub fn generate_lookup(
+    project: &Project,
+    lookup: &CheckedLookup,
+    generator: &mut Generator,
+) {
+    let scope_id = lookup.lhs.scope_id;     
+    let mut offset: u64 = 0;
+
+    for scope_var in project.scope_variables(scope_id).iter() {
+        if scope_var.name == lookup.lhs.name {
+            break;
+        } else {
+            offset += project.get_type_size(scope_var.type_id).unwrap() as u64;
+        }
+    }
+
+    let op = Op::single(
+        OpKind::ResolveVariable,
+        Operand::Uint(offset),
+    );
+
+    generator.append(op);
+
+    let mut typ = Type::Object;
+
+    if lookup.type_id == PTR_TYPE_ID || lookup.type_id == STRING_TYPE_ID {
+        typ = Type::Ptr;
+    } else if lookup.type_id == INT_TYPE_ID || lookup.type_id == BOOL_TYPE_ID {
+        typ = Type::Num;
+    } else {
+        typ = Type::Object;
+    }
+
+    let op = Op::double(
+        OpKind::ResolveField,
+        Operand::Uint(lookup.offset as u64),
+        Operand::Type(typ),
+    );
+
+    generator.append(op);
 }
 
 pub fn generate_function(

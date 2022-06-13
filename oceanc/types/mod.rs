@@ -17,6 +17,14 @@ pub type DefinitionResult = Result<CheckedDefinition, TypeError>;
 pub type StatementResult = Result<CheckedStatement, TypeError>;
 pub type ExpressionResult = Result<CheckedExpression, TypeError>;
 
+#[derive(Debug, Clone)]
+pub struct CheckedLookup {
+    pub lhs: CheckedVariable,
+    pub rhs: String,
+
+    pub type_id: TypeId,
+    pub offset: usize,
+}
 
 #[derive(Debug, Clone)]
 pub struct CheckedNamedArgument {
@@ -126,7 +134,8 @@ pub enum CheckedExpression {
     Binary(CheckedBinaryExpression),    
     Call(CheckedFunctionCall),
     StructInit(CheckedStructInit),
-    Bool(bool)
+    Bool(bool),
+    Lookup(CheckedLookup),
 }
 
 #[derive(Debug, Clone)]
@@ -328,5 +337,21 @@ impl CheckedStruct {
             fields,
             type_id: None,
         } 
+    }
+}
+
+impl CheckedLookup {
+    pub fn new(
+        lhs: CheckedVariable,
+        rhs: String,
+        id: TypeId,
+        offset: usize,
+    ) -> Self {
+        Self {
+            lhs, 
+            rhs,
+            type_id: id,
+            offset,
+        }
     }
 }

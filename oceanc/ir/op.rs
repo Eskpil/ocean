@@ -22,6 +22,7 @@ pub enum OpKind {
     NewStruct,
     SetField,
     Deref,
+    ResolveField,
 
     ResolveVariable,
     NewVariable,

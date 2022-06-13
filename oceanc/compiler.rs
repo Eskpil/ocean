@@ -79,6 +79,6 @@ impl Compiler {
         let object_file = format!("{}.o", self.output);
 
         util::run_cmd_echoed(format!("nasm -felf64 {}.asm", self.output));
-        util::run_cmd_echoed(format!("clang -fsanitize=address,undefined -no-pie -o {} {runtime_link} ./{object_file}", self.output));
+        util::run_cmd_echoed(format!("clang -no-pie -o {} {runtime_link} ./{object_file}", self.output));
     }
 }

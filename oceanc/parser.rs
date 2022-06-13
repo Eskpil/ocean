@@ -127,6 +127,16 @@ impl Parser {
         }
     }
 
+    pub fn parse_identifier(&mut self, lhs: Token) -> ParseResult<Expression> {
+        if self.peek() == TokenKind::Dot {
+            self.consume(TokenKind::Dot)?;
+            let rhs = self.consume_next(TokenKind::Identifier)?;
+            Ok(Expression::Lookup(lhs.value.clone(), rhs.value.clone()))
+        } else {
+            Ok(Expression::Identifier(lhs.value.clone()))
+        }
+    }
+
     pub fn parse_literal(&mut self, lit: TokenKind) -> ParseResult<Expression> {
         let token = self.next_token()?;
         
@@ -134,7 +144,7 @@ impl Parser {
             TokenKind::Literal => Expression::Literal(token.value.parse::<u64>().unwrap()), 
             TokenKind::True => Expression::Bool(true),
             TokenKind::False => Expression::Bool(false),
-            TokenKind::Identifier => Expression::Identifier(token.value.clone()),
+            TokenKind::Identifier => self.parse_identifier(token.clone())?,
             TokenKind::StringLiteral => { 
                 let value = token.value.clone();
                 let unescaped = unescape(&value).unwrap();
