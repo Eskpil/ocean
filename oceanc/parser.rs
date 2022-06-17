@@ -351,7 +351,6 @@ impl Parser {
 
         while !self.at(TokenKind::RightCurly) {
             if self.multi_at(&[
-                TokenKind::Identifier, 
                 TokenKind::If, 
                 TokenKind::Let, 
                 TokenKind::Function, 
@@ -382,27 +381,6 @@ impl Parser {
     pub fn parse_block(&mut self) -> ParseResult<Statement> {
         let (span, body) = self.parse_block_body()?;    
         let stmt = Statement::Block(span, body);
-
-        Ok(stmt)
-    }
-
-    pub fn parse_ident_begin(&mut self) -> ParseResult<Statement> {
-        let ident_token = self.consume_next(TokenKind::Identifier)?;
-        let ident_value = ident_token.value.clone();
-        let ident = Expression::Identifier(ident_token.span, ident_value.clone());
-
-        let stmt = match self.peek() {
-            TokenKind::LeftParen => {
-                let expr = self.parse_function_call(ident)?;
-                let stmt = Statement::Expression(expr.span(), expr.clone());
-                stmt
-            }
-            _ => {
-                let expr = self.parse_expression(0, Some(ident))?;
-                let stmt = Statement::Expression(expr.span(), expr.clone());
-                stmt
-            }
-        };
 
         Ok(stmt)
     }
@@ -578,7 +556,6 @@ impl Parser {
 
     pub fn parse_statement(&mut self) -> ParseResult<Statement> {
         match self.peek() {
-            TokenKind::Identifier => self.parse_ident_begin(),
             TokenKind::Let => self.parse_let_statement(),
             TokenKind::LeftCurly => self.parse_block(),
             TokenKind::Struct => self.parse_definition(),
