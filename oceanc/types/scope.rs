@@ -5,7 +5,7 @@ use super::{
     TypeId,
     CheckedStruct,
 };
-use crate::errors::{TypeError};
+use crate::errors::{OceanError, Level, Step};
 
 #[derive(Debug, Clone)]
 pub struct Scope {
@@ -62,17 +62,26 @@ impl Scope {
     pub fn find_struct(
         &self,
         name: String,
-    ) -> Result<CheckedStruct, TypeError> {
+    ) -> Result<CheckedStruct, OceanError> {
         match self.structs.iter().find(|&x| x.name == name.clone()) {
             Some(structure) => Ok(structure.clone()),
-            None => Err(TypeError::StructNotInScope(name.clone())),
+            None => Err(
+                OceanError::no_span(
+                    Level::Error,
+                    Step::Checking,
+                    format!(
+                        "Function: {} does not exist in current scope.", 
+                        name.clone()
+                    ),                    
+                )
+            )
         }
     }
 
     pub fn find_struct_by_id(
         &self,
         id: TypeId,
-    ) -> Result<CheckedStruct, TypeError> {
+    ) -> Result<CheckedStruct, OceanError> {
         match self.structs.iter().find(|&x| x.type_id.unwrap() == id) {
             Some(structure) => Ok(structure.clone()),
             None => todo!("Error when looking up by type_id"),
@@ -82,20 +91,38 @@ impl Scope {
     pub fn find_variable(
         &self, 
         name: String
-    ) -> Result<CheckedVariable, TypeError> {
+    ) -> Result<CheckedVariable, OceanError> {
         match self.variables.iter().find(|&x| x.name == name.clone()) {
             Some(var) => Ok(var.clone()),
-            None => Err(TypeError::VariableNotInScope(name.clone())),
+            None => Err(
+                OceanError::no_span(
+                    Level::Error,
+                    Step::Checking,
+                    format!(
+                        "Variable: {} does not exist in current scope.", 
+                        name.clone()
+                    ),                    
+                )
+            ),
         }   
     }
 
     pub fn find_function(
         &self, 
         name: String
-    ) -> Result<CheckedFunction, TypeError> {
+    ) -> Result<CheckedFunction, OceanError> {
         match self.functions.iter().find(|&x| x.name == name.clone()) {
             Some(var) => Ok(var.clone()),
-            None => Err(TypeError::FunctionNotInScope(name.clone())),
+            None => Err(
+                OceanError::no_span(
+                    Level::Error,
+                    Step::Checking,
+                    format!(
+                        "Function: {} does not exist in current scope.", 
+                        name.clone()
+                    ),                    
+                )
+            ),
         }   
     }
 

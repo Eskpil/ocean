@@ -1,6 +1,6 @@
-fn printf(message: String);
+extern fn printf(message: String);
 
 fn program() { 
-    let message = "Hello, World\n";
+    let message = "Hello, World\n"
     printf(message: message);
 }

@@ -60,12 +60,18 @@ pub enum TokenKind {
 }
 
 #[derive(Debug, Clone)]
+pub struct Span {
+    pub row: usize,
+    pub col: usize,
+    pub file_name: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub value: String,
 
-    pub row: usize,
-    pub col: usize,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug)]
@@ -77,21 +83,22 @@ pub struct Lexer {
 
     pub row: usize,
     pub col: usize,
+    pub file_name: String,
 }
 
 impl TokenKind {
     pub fn to_string(&self) -> String {
         match *self {
-            TokenKind::Literal => "literal".into(),
-            TokenKind::Identifier => "identifier".into(),
-            TokenKind::StringLiteral => "string literal".into(),
+            TokenKind::Literal => "Literal".into(),
+            TokenKind::Identifier => "Identifier".into(),
+            TokenKind::StringLiteral => "StringLiteral".into(),
 
             TokenKind::Percent => "%".into(),
             TokenKind::Semicolon => ";".into(),
             TokenKind::Comma => ",".into(),
             TokenKind::Extern => ",".into(),
 
-            TokenKind::Assignment => "assignment".into(),
+            TokenKind::Assignment => "=".into(),
             TokenKind::Let => "let".into(),
             TokenKind::Function => "fn".into(),
             TokenKind::Struct => "struct".into(),
@@ -141,29 +148,52 @@ impl TokenKind {
 
 impl Token {
     pub fn kind(kind: TokenKind) -> Token {
+        let span = Span {
+                file_name: "".into(),
+                row: 0,
+                col: 0,
+        };
+
         Token {
             kind,
             value: kind.to_string(),
-            col: 0,
-            row: 0,
+            span,
         }
     }
 
     pub fn kind_loc(kind: TokenKind, row: usize, col: usize) -> Token {
+        let span = Span {
+            file_name: "".into(),
+            row,
+            col,
+        };
+
         Token {
             kind,
             value: kind.to_string(),
-            row,
-            col,
+            span,
+        }
+    }
+
+    pub fn kind_span(kind: TokenKind, span: Span) -> Token {
+        Token {
+            kind,
+            value: kind.to_string(),
+            span,
         }
     }
 
     pub fn value(kind: TokenKind, value: impl Into<String>) -> Token {
+        let span = Span {
+            file_name: "".into(),
+            row: 0,
+            col: 0,
+        };
+
         Token {
             kind,
             value: value.into(),
-            col: 0,
-            row: 0,
+            span,
         }
     }
 }
@@ -176,7 +206,7 @@ impl PartialEq for Token {
 }
 
 impl Lexer {
-    pub fn new(source: String) -> Self {
+    pub fn new(source: String, file_name: String) -> Self {
         let mut keywords = HashMap::new();
 
         keywords.insert("let".into(), TokenKind::Let);
@@ -200,12 +230,20 @@ impl Lexer {
 
             col: 1,
             row: 1,
+            file_name: file_name.clone(),
         }
     }
 
+    pub fn span(&self) -> Span {
+        Span {
+            file_name: self.file_name.clone(),
+            row: self.row,
+            col: self.col,
+        } 
+    }
+
     pub fn numeric(&mut self) -> Token {
-        let col = self.col;
-        let row = self.row;
+        let span = self.span();
         while self.peek().is_digit(10) {
             self.advance();
         }
@@ -222,16 +260,14 @@ impl Lexer {
         let token = Token {
             kind: TokenKind::Literal,
             value: value.into(),
-            row,
-            col,
+            span,
         };
 
         token
     }
 
     pub fn identifier(&mut self) -> Token {
-        let col = self.col;
-        let row = self.row;
+        let span = self.span();
         while self.peek().is_alphabetic() || self.peek().is_digit(10) {
             self.advance();
         }
@@ -241,8 +277,7 @@ impl Lexer {
         let mut token = Token {
             kind: TokenKind::Identifier,
             value: value.into(),
-            row,
-            col,
+            span,
         };
 
         match self.keywords.get(value.into()) {
@@ -256,8 +291,7 @@ impl Lexer {
     }
 
     pub fn string(&mut self) -> Token {
-        let col = self.col;
-        let row = self.row;
+        let span = self.span();
 
         /* Advance to consume the first " in the literal. */
         self.advance();
@@ -275,8 +309,7 @@ impl Lexer {
         Token {
             kind: TokenKind::StringLiteral,
             value: value.into(),
-            row,
-            col,
+            span,
         }
     }
 
@@ -328,122 +361,136 @@ impl Iterator for Lexer {
                 self.next()            
             }
             '&' => {
-                let token = Token::kind_loc(TokenKind::Ampersand, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Ampersand, span);
                 self.advance();
                 Some(token)
             }
             '.' => {
-                let token = Token::kind_loc(TokenKind::Dot, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Dot, span);
                 self.advance();
                 Some(token)
             }
             ',' => {
-                let token = Token::kind_loc(TokenKind::Comma, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Comma, span);
                 self.advance();
                 Some(token)
             }
             ':' => {
-                let token = Token::kind_loc(TokenKind::Colon, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Colon, span);
                 self.advance();
                 Some(token)
             }
             ';' => {
-                let token = Token::kind_loc(TokenKind::Semicolon, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Semicolon, span);
                 self.advance();
                 Some(token)
             }
             '%' => {
-                let token = Token::kind_loc(TokenKind::Percent, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Percent, span);
                 self.advance();
                 Some(token)
             }
             ')' => {
-                let token = Token::kind_loc(TokenKind::RightParen, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::RightParen, span);
                 self.advance();
                 Some(token)
             }
             '(' => {
-                let token = Token::kind_loc(TokenKind::LeftParen, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::LeftParen, span);
                 self.advance();
                 Some(token)
             }
             ']' => {
-                let token = Token::kind_loc(TokenKind::RightBracket, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::RightBracket, span);
                 self.advance();
                 Some(token)
             }
             '[' => {
-                let token = Token::kind_loc(TokenKind::LeftBracket, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::LeftBracket, span);
                 self.advance();
                 Some(token)
             }
             '}' => {
-                let token = Token::kind_loc(TokenKind::RightCurly, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::RightCurly, span);
                 self.advance();
                 Some(token)
             }
             '{' => {
-                let token = Token::kind_loc(TokenKind::LeftCurly, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::LeftCurly, span);
                 self.advance();
                 Some(token)
             }
             '=' => {
-                let token = Token::kind_loc(TokenKind::Assignment, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Assignment, span);
                 self.advance();
                 Some(token)
             }
             '+' => {
-                let token = Token::kind_loc(TokenKind::Add, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Add, span);
                 self.advance();
                 Some(token)
             }
             '>' => {
-                let row = self.row;
-                let col = self.col;
+                let span = self.span();
                 self.advance();
                 if self.peek() == '=' {
                     self.advance();
-                    Some(Token::kind_loc(TokenKind::GreaterEquals, row, col))
+                    Some(Token::kind_span(TokenKind::GreaterEquals, span))
                 } else {
-                    Some(Token::kind_loc(TokenKind::Greater, row, col)) 
+                    Some(Token::kind_span(TokenKind::Greater, span)) 
                 }
             }
             '<' => {
-                let row = self.row;
-                let col = self.col;
+                let span = self.span();
                 self.advance();
                 if self.peek() == '=' {
                     self.advance();
-                    Some(Token::kind_loc(TokenKind::LessEquals, row, col))
+                    Some(Token::kind_span(TokenKind::LessEquals, span))
                 } else {
-                    Some(Token::kind_loc(TokenKind::Less, row, col))
+                    Some(Token::kind_span(TokenKind::Less, span))
                 }
             }
             '!' => {
-                let token = Token::kind_loc(TokenKind::Not, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Not, span);
                 self.advance();
                 Some(token)
             }
             '-' => {
-                let row = self.row;
-                let col = self.col;
+                let span = self.span();
                 self.advance();
                 if self.peek() == '>' {
                     self.advance();
-                    let token = Token::kind_loc(TokenKind::Arrow, row, col); 
+                    let token = Token::kind_span(TokenKind::Arrow, span); 
                     Some(token)
                 } else {
-                    let token = Token::kind_loc(TokenKind::Sub, row, col);
+                    let token = Token::kind_span(TokenKind::Sub, span);
                     Some(token)
                 }
             }
             '/' => {
-                let token = Token::kind_loc(TokenKind::Div, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Div, span);
                 self.advance();
                 Some(token)
             }
             '*' => {
-                let token = Token::kind_loc(TokenKind::Mul, self.row, self.col);
+                let span = self.span();
+                let token = Token::kind_span(TokenKind::Mul, span);
                 self.advance();
                 Some(token)
             }

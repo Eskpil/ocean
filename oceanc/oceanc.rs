@@ -9,15 +9,9 @@ mod unescape;
 mod types;
 mod compiler;
 
-use ast::statements::Statement;
-use errors::syntax::SyntaxError;
-use ir::generator::Generator;
-use ir::project::generate_project;
-use backend::nasm::{NasmBackend};
 use types::project::Project;
 use compiler::Compiler;
 use std::env;
-use std::process;
 
 use parser::Parser;
 

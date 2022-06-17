@@ -1,8 +1,9 @@
 pub mod project;
 pub mod scope;
 
-use crate::errors::{TypeError};
+use crate::errors::{OceanError};
 use crate::ast::BinaryOp;
+use crate::lexer::Span;
 
 pub type TypeId = usize;
 pub type ScopeId = usize;
@@ -13,9 +14,8 @@ pub const BOOL_TYPE_ID: TypeId = 2;
 pub const STRING_TYPE_ID: TypeId = 3;
 pub const PTR_TYPE_ID: TypeId = 4;
 
-pub type DefinitionResult = Result<CheckedDefinition, TypeError>;
-pub type StatementResult = Result<CheckedStatement, TypeError>;
-pub type ExpressionResult = Result<CheckedExpression, TypeError>;
+pub type StatementResult = Result<CheckedStatement, OceanError>;
+pub type ExpressionResult = Result<CheckedExpression, OceanError>;
 
 #[derive(Debug, Clone)]
 pub struct CheckedLookup {
@@ -32,6 +32,8 @@ pub struct CheckedNamedArgument {
     pub type_id: TypeId,
     pub offset: usize,
     pub expr: CheckedExpression,
+
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -216,12 +218,14 @@ impl CheckedNamedArgument {
     pub fn new(
         name: String, 
         type_id: TypeId, 
-        expr: CheckedExpression
+        expr: CheckedExpression,
+        span: Span,
     ) -> Self {
         Self {
             name,
             type_id,
             expr,
+            span,
             offset: 0,
         }
     }

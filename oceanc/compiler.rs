@@ -2,10 +2,11 @@ use crate::types::project::Project;
 use crate::ir::generator::Generator;
 use crate::parser::Parser;
 use crate::ast::statements::Statement;
-use crate::errors::syntax::SyntaxError;
+use crate::errors::{Level};
 use crate::backend::nasm::NasmBackend;
 use crate::ir::project::generate_project;
 use crate::util;
+use crate::lexer::Span;
 
 use std::process;
 use std::fs;
@@ -32,26 +33,46 @@ impl Compiler {
         &mut self,
         input_file: String,
     ) {
-        let mut parser = Parser::new(fs::read_to_string(input_file).unwrap()); 
+        let mut parser = Parser::new(
+            fs::read_to_string(input_file.clone()).unwrap(), 
+            input_file.clone(),
+        ); 
 
         let mut children = Vec::<Statement>::new();
 
         loop {
+            if parser.ended {
+                break;
+            }
+
             match parser.parse_statement() {
                 Ok(statement) => children.push(statement),
                 Err(err) => {
-                    if let SyntaxError::End = err {
-                        break;
+                    if err.level == Level::Ignore { 
+                        continue; 
                     } else {
-                        panic!("Encountered unexepected error: {:?}", err);
-                    } 
+                        err.report();
+                    }
                 }
             }
         }
 
-        let program = Statement::Program(children);
+        let span = Span {
+            row: 0,
+            col: 0,
+            file_name: input_file.clone(),
+        };
 
-        self.project.typecheck_program(&program).unwrap();
+        let program = Statement::Program(span, children);
+
+        match self.project.typecheck_program(&program) {
+            Ok(_) => return,
+            Err(err) => {
+                if err.level != Level::Ignore { 
+                    err.report();
+                }
+            }
+        };
     }
 
     pub fn generate_backend(

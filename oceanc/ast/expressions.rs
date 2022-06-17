@@ -1,35 +1,38 @@
+use crate::lexer::Span;
 use super::{util, BinaryOp};
 use std::boxed::Box;
-use crate::ir::{
-    generator::Generator,
-    op::{Op, OpKind, Operand},
-};
 use std::process;
 
 #[derive(Debug, Clone)]
 pub struct NamedArgument {
     pub name: String,
+    pub span: Span,
     pub value: Expression,
 }
 
 #[derive(Debug, Clone)]
 pub enum Expression {
-    Empty,
-    Literal(u64),
-    StructInit(String, Vec<NamedArgument>),
-    Bool(bool),
-    StringLiteral(String),
-    Identifier(String),
-    Binary(BinaryOp, Box<Expression>, Box<Expression>),
-    Unary(BinaryOp, Box<Expression>),
-    Call(String, Vec<NamedArgument>),
-    Lookup(String, String),
+    Empty(Span),
+    Literal(Span, u64),
+    StructInit(Span, String, Vec<NamedArgument>),
+    Bool(Span, bool),
+    StringLiteral(Span, String),
+    Identifier(Span, String),
+    Binary(Span, BinaryOp, Box<Expression>, Box<Expression>),
+    Unary(Span, BinaryOp, Box<Expression>),
+    Call(Span, String, Vec<NamedArgument>),
+    Lookup(Span, String, String),
 }
 
 impl NamedArgument {
-    pub fn new(name: String, expr: Expression) -> Self {
+    pub fn new(
+        name: String, 
+        expr: Expression,
+        span: Span,
+    ) -> Self {
         Self {
             name,
+            span,
             value: expr,
         }
     }
@@ -41,9 +44,24 @@ impl NamedArgument {
 }
 
 impl Expression {
+    pub fn span(&self) -> Span {
+        match self.clone() {
+            Self::Empty(s) => s,
+            Self::Literal(s, _) => s,
+            Self::StructInit(s, _, _) => s,
+            Self::Bool(s, _) => s,
+            Self::StringLiteral(s, _) => s,
+            Self::Identifier(s, _) => s,
+            Self::Binary(s, _, _, _) => s,
+            Self::Unary(s, _, _) => s,
+            Self::Call(s, _, _) => s,
+            Self::Lookup(s, _, _) => s,
+        }
+    }
+
     pub fn as_identifier(&self) -> String {
         match self.clone() {
-            Expression::Identifier(i) => i.clone(),
+            Expression::Identifier(_, i) => i.clone(),
             expr => { 
                 eprintln!("Expression: {:?} cannot be converted into an Identifier", expr); 
                 process::exit(1);
@@ -53,18 +71,18 @@ impl Expression {
 
     pub fn print(&self, indent: usize) {
         match self.clone() {
-            Expression::Empty => {
+            Expression::Empty(_) => {
                 util::print_indent(indent, "EmptyExpression".into());
             }
-            Expression::Bool(v) => {
+            Expression::Bool(_, v) => {
                 util::print_indent(indent, "Bool:".into());
                 util::print_indent(indent + 1, format!("{}", v));
             }
-            Expression::Literal(v) => {
+            Expression::Literal(_, v) => {
                 util::print_indent(indent, "Literal:".into());
                 util::print_indent(indent + 1, format!("{}", v));
             }
-            Expression::StructInit(name, arguments) => {
+            Expression::StructInit(_, name, arguments) => {
                 util::print_indent(indent, "StructInit:".into());
                 util::print_indent(indent + 1, "Name:".into());
                 util::print_indent(indent + 2, name);
@@ -73,15 +91,15 @@ impl Expression {
                     arg.print(indent + 2);
                 }
             }
-            Expression::StringLiteral(v) => {
+            Expression::StringLiteral(_, v) => {
                 util::print_indent(indent, "StringLiteral:".into());
                 util::print_indent(indent + 1, format!("\"{v}\""));
             }
-            Expression::Identifier(v) => {
+            Expression::Identifier(_, v) => {
                 util::print_indent(indent, "Identifier:".into());
                 util::print_indent(indent + 1, v.clone());
             }
-            Expression::Binary(op, lhs, rhs) => {
+            Expression::Binary(_, op, lhs, rhs) => {
                 util::print_indent(indent, "BinaryExpression:".into());
                 util::print_indent(indent + 1, "op:".into());
                 util::print_indent(indent + 2, op.to_string());
@@ -91,14 +109,14 @@ impl Expression {
                 util::print_indent(indent + 1, "rhs:".into());
                 rhs.print(indent + 2);
             }
-            Expression::Unary(op, expr) => {
+            Expression::Unary(_, op, expr) => {
                 util::print_indent(indent, "UnaryExpression:".into());
                 util::print_indent(indent + 1, "op:".into());
                 util::print_indent(indent + 2, op.to_string());
                 util::print_indent(indent + 1, "expr".into());
                 expr.print(indent + 2);
             }
-            Expression::Call(name, arguments) => {
+            Expression::Call(_, name, arguments) => {
                 util::print_indent(indent, "CallExpression:".into());
                 util::print_indent(indent + 1, "Name:".into());
                 util::print_indent(indent + 2, name);
@@ -107,7 +125,7 @@ impl Expression {
                     arg.print(indent + 2);
                 }
             }
-            Expression::Lookup(on, field) => {
+            Expression::Lookup(_, on, field) => {
                 util::print_indent(indent, "LookupExpression:".into());
                 util::print_indent(indent + 1, "Struct:".into());
                 util::print_indent(indent + 2, on);
