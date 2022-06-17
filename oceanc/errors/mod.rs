@@ -1,22 +1,6 @@
-pub mod syntax;
-
 use crate::types::{CheckedNamedArgument};
 use crate::lexer::Span;
 use std::process;
-
-#[derive(Debug)]
-pub enum TypeError {
-    UnknownType(String),
-    MismatchedTypes(String, String),
-    VariableNotInScope(String),
-    StructNotInScope(String),
-    FunctionNotInScope(String),
-    DuplicateFunctionParameter(String),
-    DuplicateFunctionCallArgument(String),
-    ExhaustiveFunctionCallArguments(usize, Vec<CheckedNamedArgument>),
-    UnknownFunctionArgument(String),
-    VoidAssignment,
-}
 
 #[derive(Debug, Clone)]
 pub enum Step {
