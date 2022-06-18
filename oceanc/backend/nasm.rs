@@ -295,7 +295,26 @@ impl NasmBackend {
 
                     write!(self.output, "    pop rax\n");
                     write!(self.output, "    pop r12\n");
-                    write!(self.output, "    mov [r12 + {}], rax\n", offset);
+                    // write!(self.output, "    mov [r12 + {}], rax\n", offset);
+
+                    write!(self.output, "    mov {}, r12\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), offset);
+                    write!(self.output, "    mov {}, rax\n", self.convention.get(&2).unwrap());
+                    write!(self.output, "    xor eax, eax\n");
+
+                    match typ {
+                        Type::Reference |
+                        Type::Object => {
+                            write!(self.output, "    call gpa_memory_set_object_field\n");                                      
+                        }
+                        Type::Num => {
+                            write!(self.output, "    call gpa_memory_set_num_field\n");
+                        }
+                        Type::Ptr => {
+                            write!(self.output, "    call gpa_memory_set_ptr_field\n");
+                        }
+                    }
+
                     write!(self.output, "    push r12\n");
 
                     self.current.gc_count -= 1;
@@ -306,7 +325,25 @@ impl NasmBackend {
                     let typ = op.operands()[1].as_type();
 
                     write!(self.output, "    pop r12\n");
-                    write!(self.output, "    mov rax, [r12 + {}]\n", offset);
+                    // write!(self.output, "    mov rax, [r12 + {}]\n", offset);
+
+                    write!(self.output, "    mov {}, r12\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), offset);
+                    write!(self.output, "    xor eax, eax\n");
+
+                    match typ {
+                        Type::Reference |
+                        Type::Object => {
+                            write!(self.output, "    call gpa_memory_get_object_field\n");                                      
+                        }
+                        Type::Num => {
+                            write!(self.output, "    call gpa_memory_get_num_field\n");
+                        }
+                        Type::Ptr => {
+                            write!(self.output, "    call gpa_memory_get_ptr_field\n");
+                        }
+                    }
+
                     write!(self.output, "    push rax\n");
                 }
                 OpKind::NewStruct => {

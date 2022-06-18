@@ -17,6 +17,8 @@ struct mem_header {
 
 extern void *gpa_allocate_sized(size_t);
 extern void *gpa_allocate_counted(size_t);
+extern void *gpa_allocate_counted_from(size_t, void *);
+
 extern void gpa_memory_free(void *memory);
 
 extern void gpa_memory_ref_inc(void *memory);

@@ -19,6 +19,18 @@ extern void *gpa_allocate_counted(size_t size) {
 	return memory + 1;
 }
 
+extern void *gpa_allocate_counted_from(size_t size, void *prev) { 
+    struct mem_header *const prev_header = prev - sizeof(struct mem_header);
+    struct mem_header *memory = malloc(size + sizeof(struct mem_header));
+
+    if (!memory) return NULL;
+
+    memory->count = prev_header->count;
+    memory->check = prev_header->check;
+
+    return memory + 1;
+}
+
 extern void gpa_memory_free(void *memory) {
     free(memory);
 }
@@ -65,8 +77,8 @@ extern void gpa_memory_set_object_field(
 
     gpa_memory_ref_inc(data);
 
-    void *location = (void *)(memory + offset);
-    location = data;
+    void **location = ((void **)memory) + offset;
+    *location = data;
 }
 
 extern void gpa_memory_set_num_field(
@@ -80,8 +92,8 @@ extern void gpa_memory_set_num_field(
         abort();
     }
 
-    U8 *location = (U8 *)(memory + offset);
-    location = &data;
+    U8 *location = ((U8 *)memory) + offset;
+    *location = data;
 }
 
 extern void gpa_memory_set_ptr_field(
@@ -95,8 +107,8 @@ extern void gpa_memory_set_ptr_field(
         abort();
     }
 
-    void *location = (void *)(memory + offset);
-    location = data;
+    void **location = ((void **)memory) + offset;
+    *location = data;
 }
 
 extern void *gpa_memory_get_object_field(
@@ -109,8 +121,8 @@ extern void *gpa_memory_get_object_field(
         abort();
     }
 
-    void *location = (void *)(memory + offset);
-    return location;
+    void **location = ((void **)memory) + offset;
+    return *location;
 }
 
 extern U8 gpa_memory_get_num_field(
@@ -123,8 +135,9 @@ extern U8 gpa_memory_get_num_field(
         abort();
     }
 
-    U8 location = (U8)(memory + offset);
-    return location;
+    U8 *location = ((U8 *)memory) + offset;
+
+    return *location;
 }
 
 extern void *gpa_memory_get_ptr_field(
@@ -137,9 +150,7 @@ extern void *gpa_memory_get_ptr_field(
         abort();
     }
 
-    void *location = (void *)(memory + offset);
+    void **location = ((void **)memory) + offset;
 
-    printf("[INFO]: Location: %p\n", (const void *)location);
-
-    return location;
+    return *location;
 }
