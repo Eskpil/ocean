@@ -1,7 +1,9 @@
-extern fn printf(message: String);
+extern fn println(message: String);
 
 fn program() {
-    while true { 
-        printf(message: "Hello\n");
+    let i = 0;
+    while 10 > i { 
+        let i = i + 1;
+        println(message: "Hello");
     };
 }
