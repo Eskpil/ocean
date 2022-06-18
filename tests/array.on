@@ -1,7 +1,7 @@
-extern fn putnum(num: Int);
+extern fn println(message: String);
 
 fn program() {
-    let array = [1, 2, 3, 4, 5, 6];
+    let array = ["John", "Alice"];
 
-    putnum(num: array[4]);
+    println(message: array[0]);
 }

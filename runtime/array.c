@@ -22,28 +22,19 @@ extern struct array *runtime_allocate_array(
 
     size_t struct_size = sizeof(struct array);
 
-    struct array *array = gpa_allocate_counted(struct_size); 
+    struct array *array = gpa_allocate_counted(struct_size + (nelem * elem_size)); 
 
     array->size = 0;
     array->capacity = nelem;
     array->elem_size = elem_size;
 
-    void *data = gpa_allocate_sized(nelem * elem_size);
+    // void *data = gpa_allocate_sized(nelem * elem_size);
+    void *data = array + struct_size;
 
     array->first = data;
     array->last = data;
 
     return array;
-}
-
-extern void *runtime_array_at(
-    struct array *array,     
-    U8 index
-) {
-    U8 offset = array->elem_size * index;
-    void *location = ((void *)array->first) + offset;
-
-    return location;
 }
 
 extern U8 runtime_array_at_num(
@@ -52,7 +43,14 @@ extern U8 runtime_array_at_num(
 ) {
     U8 *location = ((U8 *)(array->first + (index * array->elem_size)));
 
-    U8 *first = (U8 *)array->first;
+    return *location;
+}
+
+extern void *runtime_array_at_ptr(
+    struct array *array,     
+    U8 index
+) {
+    void **location = ((void **)(array->first + (index * array->elem_size)));
 
     return *location;
 }
@@ -85,46 +83,6 @@ extern void *runtime_array_delete(
     return elem;
 }
 
-extern struct array *runtime_array_append(
-    struct array *array,
-    void *data
-) {
-    if (array->size == 0) {
-        array->first = data;
-        array->last = data;
-        array->size += 1; 
-
-        return array;
-    } else if (array->size == array->capacity) {
-        U8 capacity = array->capacity * 2;
-        struct array *new_array = gpa_allocate_counted_from((array->elem_size * capacity) + sizeof(struct array), array);  
-
-        new_array->size = 0; 
-        new_array->capacity = capacity;
-        new_array->elem_size = array->elem_size;
-
-        for (U8 i = 0; i < array->size; ++i) {
-            U8 offset = array->elem_size * i;
-            new_array->last = ((void *)array->first) + offset;
-            new_array->size += 1;
-        }
-
-        new_array->last = data;
-        new_array->size += 1;
-
-        gpa_memory_free(array->first);
-        gpa_memory_free(array->last);
-        gpa_memory_free(array);
-
-        return new_array;
-    } else {
-        array->last = data;
-        array->size += 1;     
-
-        return array;
-    }
-}
-
 extern struct array *runtime_array_append_num(
     struct array *array,
     U8 data 
@@ -146,18 +104,92 @@ extern struct array *runtime_array_append_num(
         new_array->capacity = capacity;
         new_array->elem_size = array->elem_size;
 
+        void *data_loc = new_array + sizeof(struct array);
+
+        new_array->first = data_loc;
+        new_array->last = data_loc;
+
         for (U8 i = 0; i < array->size; ++i) {
             U8 offset = array->elem_size * i;
-            new_array->last = ((void *)array->first) + offset;
+            U8 *new_data = ((U8 *)array->first) + offset;
+
+            if (i == 0) {
+                *((U8 *)new_array->first) = *new_data;       
+            }
+            *((U8 *)new_array->last) = *new_data;
+
+            new_array->last += array->elem_size;
             new_array->size += 1;
         }
 
-        *((U8*)new_array->last++) = data;
+        gpa_memory_free(array);
+
+        *((U8*)new_array->last) = data;
+
+        new_array->last += array->elem_size;
         new_array->size += 1;
 
         return new_array;
     } else {
         *((U8 *)array->last) = data;
+
+        array->last += array->elem_size;
+
+        array->size += 1;
+
+        return array;
+    }
+}
+
+extern struct array *runtime_array_append_ptr(
+    struct array *array,
+    void *data 
+) {
+    if (array->size == 0) {
+        *((void **)array->first) = data;
+        *((void **)array->last) = data;
+
+        array->last += array->elem_size;
+
+        array->size += 1; 
+
+        return array;
+    } else if (array->size == array->capacity) {
+        U8 capacity = array->capacity * 2;
+        struct array *new_array = gpa_allocate_counted_from((array->elem_size * capacity) + sizeof(struct array), array);  
+
+        new_array->size = 0; 
+        new_array->capacity = capacity;
+        new_array->elem_size = array->elem_size;
+
+        void *data_loc = new_array + sizeof(struct array);
+
+        new_array->first = data_loc;
+        new_array->last = data_loc;
+
+        for (U8 i = 0; i < array->size; ++i) {
+            U8 offset = array->elem_size * i;
+            void **new_data = ((void **)array->first) + offset;
+
+            if (i == 0) {
+                *((void **)new_array->first) = *new_data;       
+            }
+            *((void **)new_array->last) = *new_data;
+
+            new_array->last += array->elem_size;
+            new_array->size += 1;
+        }
+
+        gpa_memory_free(array);
+
+        *((void **)new_array->last) = data;
+
+        new_array->last += array->elem_size;
+        new_array->size += 1;
+
+        return new_array;
+    } else {
+        *((void **)array->last) = data;
 
         array->last += array->elem_size;
 
