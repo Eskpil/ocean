@@ -24,6 +24,10 @@ pub enum OpKind {
     Deref,
     ResolveField,
 
+    ArrayInit,
+    ArrayAppend,
+    ArrayIndex,
+
     ResolveVariable,
     NewVariable,
 

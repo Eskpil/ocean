@@ -4,9 +4,13 @@ procedure:
     compiler: "clang"
     files:
       - "gpa.c"
+      - "array.c"
+      - "io.c"
   link:
     files:
       - "gpa.o"
+      - "array.o"
+      - "io.o"
     into: "runtime.so"
     target: "library"
     linker: "clang"

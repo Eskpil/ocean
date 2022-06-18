@@ -15,6 +15,8 @@ pub enum Expression {
     Empty(Span),
     Literal(Span, u64),
     StructInit(Span, String, Vec<NamedArgument>),
+    ArrayInit(Span, Vec<Expression>),
+    ArrayIndex(Span, String, u64),
     Bool(Span, bool),
     StringLiteral(Span, String),
     Identifier(Span, String),
@@ -56,6 +58,8 @@ impl Expression {
             Self::Unary(s, _, _) => s,
             Self::Call(s, _, _) => s,
             Self::Lookup(s, _, _) => s,
+            Self::ArrayInit(s, _) => s,
+            Self::ArrayIndex(s, _, _) => s,
         }
     }
 
@@ -132,6 +136,7 @@ impl Expression {
                 util::print_indent(indent + 1, "Field:".into());
                 util::print_indent(indent + 2, field);
             }
+            _ => {}
         }    
     }
 }

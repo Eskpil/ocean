@@ -62,6 +62,16 @@ impl NasmBackend {
         write!(self.output, "extern gpa_memory_get_num_field\n");
         write!(self.output, "extern gpa_memory_get_ptr_field\n");
 
+        write!(self.output, "extern runtime_allocate_array\n");
+
+        write!(self.output, "extern runtime_array_at_object\n");
+        write!(self.output, "extern runtime_array_at_ptr\n");
+        write!(self.output, "extern runtime_array_at_num\n");
+
+        write!(self.output, "extern runtime_array_append_object\n");
+        write!(self.output, "extern runtime_array_append_ptr\n");
+        write!(self.output, "extern runtime_array_append_num\n");
+
         write!(self.output, "segment .text\n");
         write!(self.output, "    global main\n");
         write!(self.output, "    main:\n");
@@ -365,6 +375,62 @@ impl NasmBackend {
                     );
 
                     write!(self.output, "    call gpa_memory_ref_dec\n");
+                }
+                OpKind::ArrayInit => {
+                    let elem_size = op.operands()[0].as_uint(); 
+                    let array_size = op.operands()[1].as_uint();
+
+                    write!(self.output, "    ; -- ArrayInit --\n");
+                    write!(self.output, "    mov {}, {elem_size}\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    mov {}, {array_size}\n", self.convention.get(&1).unwrap());
+                    write!(self.output, "    xor eax, eax\n");
+                    write!(self.output, "    call runtime_allocate_array\n");
+                    write!(self.output, "    push rax\n");
+                    self.current.gc_count += 1;
+                }
+                OpKind::ArrayAppend => {
+                    let typ = op.operands()[0].as_type();
+
+                    write!(self.output, "    ; -- ArrayAppend --\n");
+                    write!(self.output, "    pop {}\n", self.convention.get(&1).unwrap());
+                    write!(self.output, "    pop {}\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    xor eax, eax\n");
+
+                    match typ {
+                        Type::Reference |
+                        Type::Object => {
+                            write!(self.output, "    call runtime_array_append_object\n");                                      
+                        }
+                        Type::Num => {
+                            write!(self.output, "    call runtime_array_append_num\n");
+                        }
+                        Type::Ptr => {
+                            write!(self.output, "    call runtime_array_append_ptr\n");
+                        }
+                    }
+
+                    write!(self.output, "    push rax\n");;
+                    self.current.gc_count -= 1;
+                }
+                OpKind::ArrayIndex => {
+                    let index = op.operands()[0].as_uint();
+                    let typ = op.operands()[1].as_type();
+                    write!(self.output, "    ; -- ArrayIndex --\n"); 
+                    write!(self.output, "    pop {}\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    mov {}, {index}\n", self.convention.get(&1).unwrap());
+                    match typ {
+                        Type::Reference |
+                        Type::Object => {
+                            write!(self.output, "    call runtime_array_at_object\n");                                      
+                        }
+                        Type::Num => {
+                            write!(self.output, "    call runtime_array_at_num\n");
+                        }
+                        Type::Ptr => {
+                            write!(self.output, "    call runtime_array_at_ptr\n");
+                        }
+                    }
+                    write!(self.output, "    push rax\n");
                 }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 
             }

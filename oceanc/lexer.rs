@@ -268,7 +268,11 @@ impl Lexer {
 
     pub fn identifier(&mut self) -> Token {
         let span = self.span();
-        while self.peek().is_alphabetic() || self.peek().is_digit(10) {
+        while 
+            self.peek().is_alphabetic() || 
+            self.peek().is_digit(10) || 
+            self.peek() == '_' 
+        {
             self.advance();
         }
 

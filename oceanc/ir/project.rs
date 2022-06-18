@@ -29,6 +29,8 @@ use crate::types::{
     CheckedReturn,
     CheckedStructInit,
     CheckedLookup,
+    CheckedArrayInit,
+    CheckedArrayIndex,
 };
 
 pub fn generate_project(project: &Project, generator: &mut Generator) {
@@ -346,7 +348,90 @@ pub fn generate_expression(
             ),
         CheckedExpression::Lookup(expr) =>
             generate_lookup(project, expr, generator),
+        CheckedExpression::ArrayInit(expr) =>
+            generate_array_init(project, expr, generator),
+        CheckedExpression::ArrayIndex(expr) =>
+            generate_array_index(project, expr, generator),
         o => todo!("Implement expression: {:?}", o),
+    }
+}
+
+pub fn generate_array_index(
+    project: &Project,
+    index: &CheckedArrayIndex,
+    generator: &mut Generator
+) {
+    let mut offset: u64 = 0;
+
+    for scope_var in project.scope_variables(index.scope_id).iter() {
+        if scope_var.name == index.ident {
+            break;
+        } else {
+            offset += project.get_type_size(scope_var.type_id).unwrap() as u64; 
+        } 
+    }
+     
+    let op = Op::single(
+        OpKind::ResolveVariable,
+        Operand::Uint(offset),
+    );
+
+    let mut typ = Type::Object;
+
+    if index.type_id == PTR_TYPE_ID || index.type_id == STRING_TYPE_ID {
+        typ = Type::Ptr;
+    } else if index.type_id == INT_TYPE_ID || index.type_id == BOOL_TYPE_ID {
+        typ = Type::Num;
+    } else {
+        typ = Type::Object;
+    }
+
+
+    generator.append(op);
+
+    let op = Op::double(
+        OpKind::ArrayIndex,
+        Operand::Uint(index.index),
+        Operand::Type(typ),
+    );
+
+    generator.append(op);
+}
+
+pub fn generate_array_init(
+    project: &Project,
+    array: &CheckedArrayInit,
+    generator: &mut Generator,
+) {
+    let array_size = array.arguments.len();   
+    let elem_size = project.get_type_size(array.contains).unwrap();
+
+    let op = Op::double(
+        OpKind::ArrayInit,
+        Operand::Uint(elem_size as u64),
+        Operand::Uint(array_size as u64),
+    );
+
+    generator.append(op);
+
+    for arg in array.arguments.iter() {
+        generate_expression(project, arg, generator);
+
+        let mut typ = Type::Object;
+
+        if array.contains == PTR_TYPE_ID || array.contains == STRING_TYPE_ID {
+            typ = Type::Ptr;
+        } else if array.contains == INT_TYPE_ID || array.contains == BOOL_TYPE_ID {
+            typ = Type::Num;
+        } else {
+            typ = Type::Object;
+        }
+
+        let op = Op::single(
+            OpKind::ArrayAppend,
+            Operand::Type(typ),
+        );  
+        generator.append(op);
     }
 }
 

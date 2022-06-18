@@ -64,6 +64,22 @@ pub struct CheckedStructInit {
 }
 
 #[derive(Debug, Clone)]
+pub struct CheckedArrayInit {
+    pub arguments: Vec<CheckedExpression>,
+
+    pub contains: TypeId,
+}
+
+#[derive(Debug, Clone)]
+pub struct CheckedArrayIndex {
+    pub ident: String,
+    pub index: u64,
+
+    pub scope_id: ScopeId,
+    pub type_id: TypeId,
+}
+
+#[derive(Debug, Clone)]
 pub struct CheckedStruct {
     pub name: String,
     pub size: usize,
@@ -139,6 +155,8 @@ pub enum CheckedExpression {
     StructInit(CheckedStructInit),
     Bool(bool),
     Lookup(CheckedLookup),
+    ArrayInit(CheckedArrayInit),
+    ArrayIndex(CheckedArrayIndex),
 }
 
 #[derive(Debug, Clone)]
@@ -359,6 +377,34 @@ impl CheckedLookup {
             rhs,
             type_id: id,
             offset,
+        }
+    }
+}
+
+impl CheckedArrayInit {
+    pub fn new(
+        arguments: Vec<CheckedExpression>,
+        contains: TypeId,
+    ) -> Self {
+        Self {
+            arguments,
+            contains,
+        }
+    }
+}
+
+impl CheckedArrayIndex {
+    pub fn new(
+        ident: String,
+        index: u64,
+        type_id: TypeId,
+        scope_id: ScopeId,
+    ) -> Self {
+        Self {
+            ident,
+            index,
+            type_id,
+            scope_id,
         }
     }
 }

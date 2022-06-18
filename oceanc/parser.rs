@@ -184,6 +184,26 @@ impl Parser {
         Ok(literal)
     }
 
+    pub fn parse_array(&mut self) -> ParseResult<Expression> {
+        let start = self.consume_next(TokenKind::LeftBracket)?;  
+        let mut arguments = Vec::<Expression>::new();
+
+        while self.peek() != TokenKind::RightBracket {
+            let expr = self.parse_expression(0, None)?; 
+            arguments.push(expr);
+            if !self.at(TokenKind::Comma) {
+                break;
+            } else {
+                self.consume(TokenKind::Comma)?;
+            }
+        }
+
+        self.consume(TokenKind::RightBracket)?;
+
+        let expr = Expression::ArrayInit(start.span, arguments);
+        Ok(expr)
+    }
+
     pub fn parse_expression(&mut self, binding_power: u8, provided_lhs: Option<Expression>) -> ParseResult<Expression> {
         let mut lhs = match provided_lhs {
             Some(e) => e,
@@ -194,6 +214,9 @@ impl Parser {
                         | lit @ TokenKind::Identifier
                         | lit @ TokenKind::True
                         | lit @ TokenKind::False => self.parse_literal(lit)?,
+                    TokenKind::LeftBracket => {
+                        self.parse_array()?
+                    }
                     _ => {
                         let token = self.next_token()?;
                         return Err(
@@ -210,7 +233,7 @@ impl Parser {
         }; 
 
         if self.at(TokenKind::LeftBracket) {
-            return self.parse_struct_init(lhs);
+            return self.parse_left_bracket_begin(lhs);
         }
 
         if self.at(TokenKind::LeftParen) {
@@ -293,8 +316,40 @@ impl Parser {
         Ok(lhs)
     }
 
-    pub fn parse_struct_init(&mut self, lhs: Expression) -> ParseResult<Expression> {
-        let start = self.consume_next(TokenKind::LeftBracket)?;
+    pub fn parse_left_bracket_begin(
+        &mut self,
+        lhs: Expression,
+    ) -> ParseResult<Expression> {
+        let start = self.consume_next(TokenKind::LeftBracket)?; 
+
+        match self.peek() {
+            TokenKind::Literal => self.parse_array_index(lhs, start.span),
+            TokenKind::Identifier => self.parse_struct_init(lhs, start.span),
+            _ => todo!("Error")
+        }
+    }
+
+    pub fn parse_array_index(
+        &mut self,
+        lhs: Expression,
+        start: Span,
+    ) -> ParseResult<Expression> {
+        let index = self.consume_next(TokenKind::Literal)?
+            .value.parse::<u64>()
+            .unwrap(); 
+
+        self.consume(TokenKind::RightBracket)?;
+
+        let expr = Expression::ArrayIndex(start.clone(), lhs.as_identifier(), index);
+
+        Ok(expr)
+    }
+
+    pub fn parse_struct_init(
+        &mut self, 
+        lhs: Expression, 
+        start: Span
+    ) -> ParseResult<Expression> {
         let mut arguments = Vec::<NamedArgument>::new();
         while !self.at(TokenKind::RightBracket) {
             let name_token = self.consume_next(TokenKind::Identifier)?;
@@ -313,7 +368,7 @@ impl Parser {
             }
         }
         self.consume(TokenKind::RightBracket)?;
-        let expr = Expression::StructInit(start.span.clone(), lhs.as_identifier(), arguments);  
+        let expr = Expression::StructInit(start.clone(), lhs.as_identifier(), arguments);  
         Ok(expr)
     }
 

@@ -21,6 +21,8 @@ use super::{
     CheckedReturn,
     CheckedStructInit,
     CheckedLookup,
+    CheckedArrayInit,
+    CheckedArrayIndex,
 
     VOID_TYPE_ID,
     BOOL_TYPE_ID,
@@ -415,6 +417,12 @@ impl Project {
 
                 Ok(function.returning)
             }
+            CheckedExpression::ArrayInit(array) => {
+                Ok(array.contains)
+            }
+            CheckedExpression::ArrayIndex(index) => {
+                Ok(index.type_id)
+            }
             o => todo!("Get TypeId from {:?}", o),
         }  
     }
@@ -533,10 +541,118 @@ impl Project {
                 )?;
                 CheckedExpression::Lookup(expr)
             }
+            Expression::ArrayInit(
+                span,
+                arguments
+            ) => {
+                let expr = self.typecheck_array_init(
+                    span,
+                    &mut arguments.clone(),
+                    scope_id
+                )?;
+                CheckedExpression::ArrayInit(expr)
+            }
+            Expression::ArrayIndex(
+                span,
+                ident,
+                index
+            ) => {
+                let expr = self.typecheck_array_index(
+                    span,
+                    ident.clone(),
+                    index,
+                    scope_id,
+                )?;
+
+                CheckedExpression::ArrayIndex(expr)
+            }
             o => unreachable!("Implement typechecking for expression: {:?}", o)
         };
 
         Ok(expr)
+    }
+
+    pub fn typecheck_array_index(
+        &mut self,
+        span: &Span,
+        ident: String,
+        index: &u64,
+        scope_id: ScopeId
+    ) -> Result<CheckedArrayIndex, OceanError> {
+        let var = self.find_variable(ident.clone(), scope_id)?;
+
+        let expr = CheckedArrayIndex::new(
+            ident.clone(), 
+            *index, 
+            var.type_id, 
+            scope_id
+        );
+
+        Ok(expr)
+    }
+
+    pub fn typecheck_array_init(
+        &mut self,
+        span: &Span,
+        arguments: &mut Vec<Expression>,
+        scope_id: ScopeId,
+    ) -> Result<CheckedArrayInit, OceanError> {
+        let reference_expression = arguments.remove(0);
+
+        let reference_type = self.typecheck_expression(
+            &reference_expression.span(), 
+            &reference_expression, 
+            scope_id
+        )?;   
+
+        let reference_type_id = self.get_expression_type_id(
+            &reference_expression.span(),
+            &reference_type,
+            scope_id
+        )?;
+
+        let mut checked_arguments = Vec::<CheckedExpression>::new();
+
+        checked_arguments.push(reference_type);
+
+        for unchecked_expression in arguments.iter() {
+            let checked_expression = self.typecheck_expression(
+                &unchecked_expression.span(),
+                &unchecked_expression,
+                scope_id
+            )?; 
+
+            let checked_expression_type_id = self.get_expression_type_id(
+                &unchecked_expression.span(),
+                &checked_expression,
+                scope_id
+            )?;
+
+            if checked_expression_type_id != reference_type_id {
+                return Err(
+                    OceanError::new(
+                        Level::Error,
+                        Step::Checking,
+                        unchecked_expression.span(),
+                        format!(
+                            "Array is infeered to be of type: \x1b[1m{}\x1b[0m but found type: \x1b[1m{}\x1b[0m.",
+                            self.lookup_type_name(
+                                reference_type_id, 
+                            ).unwrap(),
+                            self.lookup_type_name(
+                                checked_expression_type_id, 
+                            ).unwrap(),
+                        )
+                    )
+                );  
+            }
+
+            checked_arguments.push(checked_expression);
+        }
+
+        let array = CheckedArrayInit::new(checked_arguments, reference_type_id);
+
+        Ok(array)
     }
     
     pub fn typecheck_lookup(
