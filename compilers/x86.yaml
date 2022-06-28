@@ -1,0 +1,6 @@
+compilers:
+  - name: "clang"
+    path: "/usr/bin/clang"
+    language: "c/c++"
+    flags:
+      - "-fPIC"

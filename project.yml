@@ -1,5 +1,6 @@
 project:
   name: "Ocean"
+  compilers: "compilers/x86.yaml"
   procedures:
       - "oceanc"
       - "runtime"
