@@ -27,7 +27,7 @@ fn main() {
 
     let mut compiler = Compiler::new("program".into());
 
-    compiler.compile_file(file_path);
+    compiler.compile_file_and_typecheck(file_path);
     compiler.generate_backend();
     compiler.link_binary();
 }

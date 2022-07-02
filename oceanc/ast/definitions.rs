@@ -3,6 +3,7 @@ use super::util;
 #[derive(Debug, Clone)]
 pub enum DefinedType {
     Name(String),
+    Array(Box<DefinedType>),
     // Leave this to the type inference.
     Empty,
 }
@@ -62,6 +63,10 @@ impl DefinedType {
                 util::print_indent(indent, "Name:".into()); 
                 util::print_indent(indent + 1, s.clone());
             } 
+            DefinedType::Array(of) => {
+                util::print_indent(indent, "Array::".into());
+                of.print(indent + 1);
+            }
             DefinedType::Empty => {
                 util::print_indent(indent, "Empty".into());
             }

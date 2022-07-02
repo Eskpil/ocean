@@ -1,0 +1,7 @@
+struct Array {
+    size: usize
+}
+
+struct String {
+    size: usize
+}

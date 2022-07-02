@@ -7,6 +7,7 @@ use crate::lexer::Span;
 
 pub type TypeId = usize;
 pub type ScopeId = usize;
+pub type StructId = usize;
 
 pub const VOID_TYPE_ID: TypeId = 0;
 pub const INT_TYPE_ID: TypeId = 1;
@@ -16,6 +17,27 @@ pub const PTR_TYPE_ID: TypeId = 4;
 
 pub type StatementResult = Result<CheckedStatement, OceanError>;
 pub type ExpressionResult = Result<CheckedExpression, OceanError>;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Type {
+    Void,
+    Bool,
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
+    Usize,
+    OceanString,
+    Ptr,
+    GenericInstance(TypeId, Vec<TypeId>),
+    Struct(StructId),
+}
 
 #[derive(Debug, Clone)]
 pub struct CheckedLookup {

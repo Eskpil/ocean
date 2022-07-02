@@ -1,12 +1,12 @@
-extern fn printf(message: String);
+extern fn println(message: String);
 
 struct Person {
     name: String
-    age: Int
+    age: usize
 }
 
 fn program() {
     let person = Person[name: "John", age: 12];
     let name = person.name;
-    printf(message: name);
+    println(message: name);
 }

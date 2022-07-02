@@ -509,10 +509,22 @@ impl Parser {
         while !self.at(TokenKind::RightCurly) {
             let field_name = self.consume_next(TokenKind::Identifier)?.value.clone();  
             self.consume(TokenKind::Colon);
-            let field_type = self.consume_next(TokenKind::Identifier)?.value.clone();
-            let defined_type = DefinedType::Name(field_type);
 
-            let field = FieldDefinition::new(field_name, defined_type);
+            let mut defined_type: Option<DefinedType> = None;
+            let field_type = self.consume_next(TokenKind::Identifier)?.value.clone();
+             
+
+            if self.peek() == TokenKind::Less {
+                self.consume(TokenKind::Less)?; 
+                let has_field = self.consume_next(TokenKind::Identifier)?.value.clone();
+                self.consume(TokenKind::Greater)?;
+
+                defined_type = Some(DefinedType::Array(Box::new(DefinedType::name(has_field))));
+            } else {
+                defined_type = Some(DefinedType::Name(field_type));   
+            } 
+
+            let field = FieldDefinition::new(field_name, defined_type.unwrap());
             fields.push(field);
         }
 
@@ -567,12 +579,11 @@ impl Parser {
 
         let r_paren = self.consume_next(TokenKind::RightParen)?;
 
-        let mut type_name = String::from("Void");
+        let mut returning = DefinedType::Empty;
 
         if self.peek() == TokenKind::Arrow {
             self.consume(TokenKind::Arrow)?;  
-            let identifier = self.consume_next(TokenKind::Identifier)?;     
-            type_name = identifier.value.clone();
+            returning = self.parse_defined_type()?;
         }
 
         let mut body: Vec<Statement> = vec![];
@@ -602,7 +613,7 @@ impl Parser {
             name, 
             parameters, 
             body, 
-            DefinedType::name(type_name),
+            returning,
             external
         );
 

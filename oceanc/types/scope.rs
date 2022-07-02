@@ -3,6 +3,7 @@ use super::{
     CheckedVariable, 
     ScopeId,
     TypeId,
+    StructId,
     CheckedStruct,
 };
 use crate::errors::{OceanError, Level, Step};
@@ -61,7 +62,7 @@ impl Scope {
 
     pub fn find_struct(
         &self,
-        name: String,
+        name: String
     ) -> Result<CheckedStruct, OceanError> {
         match self.structs.iter().find(|&x| x.name == name.clone()) {
             Some(structure) => Ok(structure.clone()),
@@ -76,6 +77,28 @@ impl Scope {
                 )
             )
         }
+    }
+
+    pub fn find_struct_id(
+        &self,
+        name: String,
+    ) -> Result<StructId, OceanError> {
+        let mut idx: usize = 0;
+        for structure in self.structs.iter() {
+            if structure.name == name.clone() {
+                return Ok(idx);
+            }
+            idx += 1; 
+        }
+
+        Err(OceanError::no_span(
+            Level::Error,
+            Step::Checking,
+            format!(
+                "Function: {} does not exist in current scope.", 
+                name.clone()
+            ),                    
+        ))
     }
 
     pub fn find_struct_by_id(

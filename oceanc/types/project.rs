@@ -1,6 +1,9 @@
 use super::{
     TypeId,
     ScopeId,
+    StructId,
+
+    Type,
 
     CheckedStruct, 
     CheckedField,
@@ -56,34 +59,75 @@ use std::boxed::Box;
 use std::collections::HashMap;
 
 #[derive(Debug)]
+pub struct Prelude {
+    pub structs: Vec<CheckedStruct>, 
+}
+
+#[derive(Debug)]
 pub struct Project {
     pub structs: Vec<CheckedStruct>, 
     pub functions: Vec<CheckedFunction>,
-    pub types: HashMap<String, TypeId>,
+    // pub types: HashMap<String, TypeId>,
+    pub types: Vec<Type>,
     pub scopes: Vec<Scope>,
 
     pub returning: TypeId,
 }
 
 impl Project {
-    pub fn new() -> Self {
-        let mut types = HashMap::new();
+    pub fn new(prelude: &Statement) -> Self {
+        let prelude_scope = Scope::new();
 
-        types.insert("Void".to_string(), VOID_TYPE_ID);
-        types.insert("Bool".to_string(), BOOL_TYPE_ID);
-        types.insert("Int".to_string(), INT_TYPE_ID);
-        types.insert("String".to_string(), STRING_TYPE_ID);
-        types.insert("Ptr".to_string(), PTR_TYPE_ID);
-
-        let program_scope = Scope::new();
-
-        Self {
+        let mut project = Self {
             structs: vec![],
             functions: vec![],
-            scopes: vec![program_scope],
-            types,
+            scopes: vec![prelude_scope],
+            types: vec![],
             returning: VOID_TYPE_ID,
-        }
+        };
+
+        println!("Prelude: {:?}\n", prelude);
+
+        match project.typecheck_program(prelude) {
+            Ok(_) => {},
+            Err(err) => {
+                if err.level != Level::Ignore { 
+                    err.report();
+                }
+            }
+        };
+
+        project.find_or_add_type_id(Type::Void);
+        project.find_or_add_type_id(Type::Bool);
+        project.find_or_add_type_id(Type::Usize);
+        project.find_or_add_type_id(Type::OceanString);
+        project.find_or_add_type_id(Type::Ptr);
+
+        return project;         
+    }
+
+    pub fn find_struct_in_prelude(&mut self, name: String) -> Result<StructId, OceanError> {
+        self.find_struct_id(name, 0)
+    }
+
+    pub fn find_or_add_type_id(&mut self, typ: Type) -> TypeId {
+        let mut idx: usize = 0;
+        for item in self.types.iter() {
+            if *item == typ {
+                return idx; 
+            }
+            idx += 1
+        } 
+
+        self.types.push(typ);
+
+        return self.types.len() - 1;
+    }
+
+    pub fn add_struct(&mut self, structure: CheckedStruct) -> StructId {
+        self.structs.push(structure);
+
+        return self.structs.len() - 1;
     }
 
     pub fn create_scope(&mut self, parent_id: ScopeId) -> ScopeId {
@@ -153,6 +197,16 @@ impl Project {
         Ok(function)
     }
 
+    pub fn find_struct_id(
+        &self,
+        name: String,
+        scope_id: ScopeId,
+    ) -> Result<StructId, OceanError> {
+        let scope = &self.scopes[scope_id];
+        let structure = scope.find_struct_id(name.clone())?;
+        Ok(structure)
+    } 
+
     pub fn find_struct(
         &self,
         name: String,
@@ -187,38 +241,12 @@ impl Project {
         }
     }
 
-    pub fn allocate_type(&mut self, name: String) -> TypeId {
-        let id = self.types.len();
-        self.types.insert(name, id.clone());
-        id
-    }
-
-    pub fn lookup_type(&self, name: String, scope_id: ScopeId) -> Result<TypeId, OceanError> {
-        match self.types.get(&name) {
-            Some(id) => Ok(id.clone()),
-            None => { 
-                match self.find_struct(name, scope_id) {
-                    Ok(s) => Ok(s.type_id.unwrap()),
-                    Err(err) => Err(err),
-                }
-            }
-        }
-    }
-
     pub fn lookup_type_name(&self, id: TypeId) -> Option<String> {
-        let mut found: Option<String> = None; 
-
-        for (type_name, type_id) in self.types.iter() {
-            if type_id.clone() == id.clone() {
-                found = Some(type_name.to_string());
-            }
-        }
-
-        found
+        Some(format!("TypeID{id}"))
     }
 
     pub fn typecheck_program(&mut self, program: &Statement) -> Result<(), OceanError> {
-        let scope_id = 0;
+        let scope_id = self.scopes.len() - 1;
         match program {
             Statement::Program(_, children) => {
                 for child in children.iter() {
@@ -350,7 +378,7 @@ impl Project {
 
         let type_id = self.get_expression_type_id(&cond.span(), &checked_cond, scope_id)?;
 
-        if type_id != self.lookup_type("Bool".into(), scope_id)? {
+        if type_id != self.find_or_add_type_id(Type::Bool) {
             todo!("Error messages for expressions not returning boolean");  
         }
 
@@ -369,7 +397,7 @@ impl Project {
 
         let type_id = self.get_expression_type_id(&stmt.cond.span(), &cond, scope_id)?;
 
-        if type_id != self.lookup_type("Bool".into(), scope_id)? {
+        if type_id != self.find_or_add_type_id(Type::Bool) {
             todo!("Error messages for expressions not returning boolean");  
         }
 
@@ -396,25 +424,27 @@ impl Project {
         scope_id: ScopeId,
     ) -> Result<TypeId, OceanError> {
         match expr {
-            CheckedExpression::Literal(_) => self.lookup_type("Int".to_string(), scope_id),
-            CheckedExpression::StringLiteral(_) => self.lookup_type("String".to_string(), scope_id),
+            CheckedExpression::Literal(_) => Ok(self.find_or_add_type_id(Type::Usize)),
+            CheckedExpression::StringLiteral(_) => {
+                let struct_id = self.find_struct_in_prelude("String".into())?;
+                Ok(self.find_or_add_type_id(Type::Struct(struct_id)))
+            }
             CheckedExpression::Identifier(name, scope) => {
                 let var = self.find_variable(name.clone(), *scope)?;
                 Ok(var.type_id)
             },
             CheckedExpression::Binary(expr) => {
                 if expr.op.returns_bool() {
-                    self.lookup_type("Bool".to_string(), scope_id)
+                    Ok(self.find_or_add_type_id(Type::Bool))
                 } else { 
-                    self.lookup_type("Int".to_string(), scope_id)
+                    Ok(self.find_or_add_type_id(Type::Usize))
                 }
             }
             CheckedExpression::Lookup(expr) => Ok(expr.type_id),
             CheckedExpression::StructInit(init) => Ok(init.returning),
-            CheckedExpression::Bool(_) => self.lookup_type("Bool".to_string(), scope_id),
+            CheckedExpression::Bool(_) => Ok(self.find_or_add_type_id(Type::Bool)),
             CheckedExpression::Call(call) => {
                 let function = self.find_function(call.name.clone(), scope_id)?;
-
                 Ok(function.returning)
             }
             CheckedExpression::ArrayInit(array) => {
@@ -692,7 +722,9 @@ impl Project {
         args: Vec<NamedArgument>,
         scope_id: ScopeId,
     ) -> Result<CheckedStructInit, OceanError> {
-        let type_id = self.lookup_type(name.clone(), scope_id)?;
+        let struct_id = self.find_struct_id(name.clone(), scope_id)?;
+        let type_id = self.find_or_add_type_id(Type::Struct(struct_id));
+
         let mut checked_arguments = Vec::<CheckedNamedArgument>::new();
 
         for argument in args.iter() {
@@ -989,7 +1021,7 @@ impl Project {
             );
         }
 
-        if type_id == VOID_TYPE_ID {
+        if type_id == self.find_or_add_type_id(Type::Void) {
             return Err(
                 OceanError::new(
                     Level::Error,
@@ -1067,8 +1099,9 @@ impl Project {
         parameter: &NamedParameter,
         scope_id: ScopeId,
     ) -> Result<CheckedNamedParameter, OceanError> {
-        let name = parameter.name.clone(); 
-        let type_id = self.lookup_type(parameter.defined_type.to_name(), scope_id)?;
+        let name = parameter.name.clone();
+        let typ = self.typecheck_type(&parameter.defined_type, scope_id)?;
+        let type_id = self.find_or_add_type_id(typ);
         Ok(CheckedNamedParameter::new(name, type_id))
     }
 
@@ -1083,12 +1116,9 @@ impl Project {
         scope_id: ScopeId,
     ) -> Result<CheckedFunction, OceanError> {
         let mut checked_parameters = Vec::<CheckedNamedParameter>::new();
-        let mut returning: TypeId = VOID_TYPE_ID;
 
-        if let DefinedType::Name(name) = defined_type.clone() {
-            let type_id = self.lookup_type(name.clone(), scope_id)?;
-            returning = type_id; 
-        } 
+        let typ = self.typecheck_type(defined_type, scope_id)?;
+        let returning = self.find_or_add_type_id(typ);
 
         for parameter in parameters.iter() {
             match checked_parameters.iter().find(
@@ -1147,6 +1177,41 @@ impl Project {
         Ok(checked_function)          
     }
 
+    pub fn typecheck_type(
+        &mut self,
+        defined_type: &DefinedType,
+        scope_id: ScopeId
+    ) -> Result<Type, OceanError> {
+        let typ = match defined_type {
+            DefinedType::Name(name) => {
+                if name == "usize" {
+                    return Ok(Type::Usize);
+                } else if name == "bool" {
+                    return Ok(Type::Bool);
+                } else if name == "String" {
+                    let struct_id = self.find_struct_in_prelude("String".into())?;
+                    return Ok(Type::Struct(struct_id));
+                } else if name == "void" {
+                    return Ok(Type::Void);
+                } else {
+                    panic!(format!("Handle type: {name}"));
+                }
+            }
+            DefinedType::Array(of) => {
+                let array_type_id = self.find_struct_in_prelude("Array".into())?;      
+                let of_type = self.typecheck_type(of, scope_id)?;
+                let of_type_id = self.find_or_add_type_id(of_type);
+
+                Type::GenericInstance(array_type_id, vec![of_type_id])
+            }  
+            DefinedType::Empty => {
+                Type::Bool
+            }
+        };  
+
+        Ok(typ)
+    }
+
     pub fn typecheck_definition(
         &mut self, 
         span: &Span,
@@ -1159,7 +1224,8 @@ impl Project {
                 let mut size = 0;
 
                 for unchecked_field in structure.fields.iter() {
-                    let id = self.lookup_type(unchecked_field.defined_type.to_name(), scope_id)?;
+                    let typ = self.typecheck_type(&unchecked_field.defined_type, scope_id)?;
+                    let id = self.find_or_add_type_id(typ);
                     size += self.get_type_size(id)?;
                     let checked_field = CheckedField::new(unchecked_field.name.clone(), id);  
                     fields.push(checked_field);
@@ -1170,12 +1236,15 @@ impl Project {
                     fields, 
                     size
                 );
-                let type_id = self.allocate_type(checked_struct.name.clone());
+                
+                let struct_id = self.add_struct(checked_struct.clone());
+                let type_id = self.find_or_add_type_id(Type::Struct(struct_id));
+
                 checked_struct.type_id = Some(type_id);
 
                 self.add_struct_to_scope(checked_struct.clone(), scope_id);
 
-                CheckedDefinition::Struct(checked_struct)
+                CheckedDefinition::Struct(checked_struct.clone())
             } 
         }; 
 

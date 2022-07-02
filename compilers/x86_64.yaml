@@ -4,3 +4,7 @@ compilers:
     language: "c/c++"
     flags:
       - "-fPIC"
+
+  - name: "rustc"
+    path: "/home/linus/.cargo/bin/rustc"
+    language: "rust"

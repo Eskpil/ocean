@@ -1,8 +1,8 @@
-fn left() -> Int {
+fn left() -> usize {
     return 69;
 }
 
-fn right() -> Int {
+fn right() -> usize {
     return 420;
 }
 

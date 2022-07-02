@@ -1,5 +1,5 @@
-fn hello() {
-    1 + 2;
+fn hello() -> usize {
+    return 1 + 2;
 }
 
 fn program() {

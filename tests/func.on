@@ -1,6 +1,6 @@
 extern fn printf(message: String);
 
-fn person(name: String, age: Int) { 
+fn person(name: String, age: usize) { 
     printf(message: "Name: ");
     printf(message: name);
     printf(message: "\n");

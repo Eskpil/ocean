@@ -12,6 +12,42 @@ use std::process;
 use std::fs;
 use std::env;
 
+fn compile_file(
+    input_file: String,
+) -> Statement {
+    let mut parser = Parser::new(
+        fs::read_to_string(input_file.clone()).unwrap(), 
+        input_file.clone(),
+    ); 
+
+    let mut children = Vec::<Statement>::new();
+
+    loop {
+        if parser.ended {
+            break;
+        }
+
+        match parser.parse_statement() {
+            Ok(statement) => children.push(statement),
+            Err(err) => {
+                if err.level == Level::Ignore { 
+                    continue; 
+                } else {
+                    err.report();
+                }
+            }
+        }
+    }
+
+    let span = Span {
+        row: 0,
+        col: 0,
+        file_name: input_file.clone(),
+    };
+
+    return Statement::Program(span, children);
+}
+
 pub struct Compiler {
     project: Project,
     generator: Generator,
@@ -22,48 +58,26 @@ impl Compiler {
     pub fn new(
         output_file: String,
     ) -> Self {
+        // This is very bad. Runtime should definitily be install globally on the system
+        // and be versioned. For now this is fine since we are just developing the language
+        // and not actually using it.
+        let pwd = env::current_dir().unwrap().into_os_string().into_string().unwrap();
+        let prelude_path = format!("{pwd}/lib/prelude.on");
+
+        let prelude = compile_file(prelude_path);
+
         Self {
-            project: Project::new(),
+            project: Project::new(&prelude),
             generator: Generator::new(),
             output: output_file,
         }
     }
 
-    pub fn compile_file(
+    pub fn compile_file_and_typecheck(
         &mut self,
         input_file: String,
     ) {
-        let mut parser = Parser::new(
-            fs::read_to_string(input_file.clone()).unwrap(), 
-            input_file.clone(),
-        ); 
-
-        let mut children = Vec::<Statement>::new();
-
-        loop {
-            if parser.ended {
-                break;
-            }
-
-            match parser.parse_statement() {
-                Ok(statement) => children.push(statement),
-                Err(err) => {
-                    if err.level == Level::Ignore { 
-                        continue; 
-                    } else {
-                        err.report();
-                    }
-                }
-            }
-        }
-
-        let span = Span {
-            row: 0,
-            col: 0,
-            file_name: input_file.clone(),
-        };
-
-        let program = Statement::Program(span, children);
+        let program = compile_file(input_file);
 
         match self.project.typecheck_program(&program) {
             Ok(_) => return,

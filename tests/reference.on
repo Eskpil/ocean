@@ -1,6 +1,6 @@
 struct Person {
     name: String
-    age: Int
+    age: usize
 }
 
 fn program() { 
