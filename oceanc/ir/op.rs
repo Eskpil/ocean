@@ -1,5 +1,7 @@
 use crate::ast::{BinaryOp};
 
+use super::register::Register;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Type {
     Ptr,
@@ -10,6 +12,8 @@ pub enum Type {
 
 #[derive(Clone, Debug)]
 pub enum OpKind {
+    Load,
+
     Block,
     Proc,
     End,
@@ -30,6 +34,7 @@ pub enum OpKind {
 
     ResolveVariable,
     NewVariable,
+    NewParameter,
 
     Push,
 
@@ -43,10 +48,15 @@ pub enum OpKind {
 pub enum Operand {
     Uint(u64),
     Bool(bool),
+
     Symbol(String),
     Data(String),
     Op(BinaryOp),
+
     Type(Type),
+
+    Reg(Register),
+    Regs(Vec<Register>),
 }
 
 #[derive(Clone, Debug)]
@@ -97,6 +107,20 @@ impl Operand {
             o => unreachable!("Expected OpKind::Type but found OpKind::{:?}", o),
         }
     }
+
+    pub fn as_reg(&self) -> Register {
+        match self {
+            Operand::Reg(reg) => reg.clone(),
+            o => unreachable!("Expected OpKind::Reg but found OpKind::{:?}", o),
+        }
+    }
+
+    pub fn as_regs(&self) -> Vec<Register> {
+        match self {
+            Operand::Regs(reg) => reg.clone(),
+            o => unreachable!("Expected OpKind::Regs but found OpKind::{:?}", o),
+        }
+    }
 }
 
 impl Op {
@@ -143,6 +167,22 @@ impl Op {
         operands.push(one);
         operands.push(two);
         operands.push(three);
+
+        Op::new(kind, operands)
+    }
+
+    pub fn quadrouple(
+        kind: OpKind, 
+        one: Operand, 
+        two: Operand,
+        three: Operand,
+        four: Operand,
+    ) -> Self {
+        let mut operands = Vec::new();
+        operands.push(one);
+        operands.push(two);
+        operands.push(three);
+        operands.push(four);
 
         Op::new(kind, operands)
     }

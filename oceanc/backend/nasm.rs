@@ -1,5 +1,5 @@
 use super::scope::{BackendScope};
-use crate::ir::{op::{Op, OpKind, Type}};
+use crate::ir::{op::{Op, OpKind, Type}, register::Register};
 use crate::ast::BinaryOp;
 use std::io::Write;
 use std::fs::File;
@@ -15,6 +15,28 @@ pub struct NasmBackend {
 
     convention: HashMap<u64, String>,
 }
+
+pub fn native_reg(reg: &Register) -> String {
+    let res = match reg.clone() {
+        Register::R1 => "rax",
+        Register::R2 => "rcx",
+        Register::R3 => "rdx",
+        Register::R4 => "rbx",
+        Register::R5 => "rsi",
+        Register::R6 => "rdi",
+        Register::R7 => "r8",
+        Register::R8 => "r9",
+        Register::R9 => "r10",
+        Register::R10 => "r11",
+        Register::R11 => "r12",
+        Register::R12 => "r13",
+        Register::R13 => "r14",
+        Register::R14 => "r15",
+    };
+
+    res.to_string()
+}
+
 
 impl NasmBackend {
     pub fn new(output_path: String) -> Self {
@@ -96,9 +118,6 @@ impl NasmBackend {
                 OpKind::Block => {
                     let symbol = op.operands()[0].as_symbol(); 
                     write!(self.output, "    ; -- Block --\n");
-                    for i in 0..self.current.gc_count {
-                        write!(self.output, "    pop rax\n");
-                    }
                     self.new_scope(symbol.clone());
                     write!(self.output, "    {}:\n", symbol);
                 } 
@@ -106,10 +125,9 @@ impl NasmBackend {
                     let symbol = op.operands()[0].as_symbol();
                     let parameters_size = op.operands()[1].as_uint();
                     write!(self.output, "    ; -- Proc --\n");
-                    for i in 0..self.current.gc_count {
-                        write!(self.output, "    pop rax\n");
-                    }
+
                     self.new_scope(symbol.clone());
+
                     write!(self.output, "    {}:\n", symbol);
                     write!(self.output, "    push rbp\n");
                     write!(self.output, "    mov rbp, rsp\n");
@@ -117,199 +135,166 @@ impl NasmBackend {
                     for i in 0..parameters_size {
                         let reg = self.convention.get(&i).unwrap();
                         write!(self.output, "    push {}\n", reg);
-                        self.current.gc_count += 1;
+                    }
+                }
+                OpKind::NewParameter => {
+                    let src = op.operands()[0].as_uint();
+                    let offset = op.operands()[1].as_uint();
+                    let typ = op.operands()[2].as_type();
+                    write!(self.output, "    ; -- NewParameter -- \n");
+                    write!(self.output, "    mov [rbp-{:x}], {}\n", offset, self.convention.get(&src).unwrap());
+
+                    if typ == Type::Reference {
+                        write!(self.output, "    mov {}, {}\n", self.convention.get(&0).unwrap(), self.convention.get(&src).unwrap());
+                        write!(self.output, "    call gpa_memory_ref_inc\n"); 
                     }
                 }
                 OpKind::End => {
                     write!(self.output, "    ; -- End --\n");
 
-                    // Clear our stack garbage.
-                    for i in 0..self.current.gc_count {
-                        write!(self.output, "    pop rax\n");
-                    }
-
                     write!(self.output, "    pop rbp\n");
                     write!(self.output, "    ret\n");
                 }
-                OpKind::Push => {
-                    let value = op.operands()[0].as_uint();
-                    write!(self.output, "    ; -- Push --\n");
-                    write!(self.output, "    mov rax, {}\n", value);
-                    write!(self.output, "    push rax\n");
-                    // We have pushed a value onto the stack.
-                    self.current.gc_count += 1;
+                OpKind::Load => {
+                    let dst = op.operands()[0].as_reg();
+                    let value = op.operands()[1].as_uint();
+
+                    write!(self.output, "    ; -- Load --\n");
+                    write!(self.output, "    mov {}, {}\n", native_reg(&dst), value);
                 }
                 OpKind::Intrinsic => {
                     let binary_op = op.operands()[0].as_op();
+
+                    let dst = op.operands()[1].as_reg();
+                    let lhs = op.operands()[2].as_reg();
+                    let rhs = op.operands()[3].as_reg();
+
                     write!(self.output, "    ; -- Intrinsic({:?}) --\n", binary_op);
                     match binary_op {
                         BinaryOp::Add => {
-                            write!(self.output, "    pop rax\n");
-                            write!(self.output, "    pop rbx\n");
-                            write!(self.output, "    add rax, rbx\n");
-                            write!(self.output, "    push rax\n");
-                            // 2 - 1 = 1. We have taken one element of the stack.
-                            self.current.gc_count -= 1;
+                            write!(self.output, "    add {}, {}\n", native_reg(&lhs), native_reg(&rhs));
+                            write!(self.output, "    mov {}, {}\n", native_reg(&dst), native_reg(&lhs));
                         }
                         BinaryOp::Mul => {
-                            write!(self.output, "    pop rax\n");
-                            write!(self.output, "    pop rbx\n");
-                            write!(self.output, "    imul rax, rbx\n");
-                            write!(self.output, "    push rax\n");
-                            // 2 - 1 = 1. We have taken one element of the stack.
-                            self.current.gc_count -= 1;                           
+                            write!(self.output, "    imul {}, {}\n", native_reg(&lhs), native_reg(&rhs));
+                            write!(self.output, "    mov {}, {}\n", native_reg(&dst), native_reg(&lhs));
                         }
                         BinaryOp::Div => {
-                            write!(self.output, "    pop rax\n"); // What we are dividing by.
-                            write!(self.output, "    pop rbx\n"); // What we are dividing.
-                            write!(self.output, "    mov rbx, rdx\n");
+                            write!(self.output, "    mov {}, rdx\n", native_reg(&lhs));
                             write!(self.output, "    cqo\n");
-                            write!(self.output, "    div rax\n");
-                            write!(self.output, "    push rbx\n");
-                            // 2 - 1 = 1. We have taken one element of the stack.
-                            self.current.gc_count -= 1;                           
+                            write!(self.output, "    div {}\n", native_reg(&rhs));
+                            write!(self.output, "    mov {}, rbx\n", native_reg(&dst));
+
                         }
                         BinaryOp::Sub => {
-                            write!(self.output, "   pop rax\n"); // What we are subtracting with.
-                            write!(self.output, "   pop rbx\n"); // What we are subtracting.
-                            write!(self.output, "   sub rax, rbx\n");
-                            write!(self.output, "   push rax\n");
-                            // 2 - 1 = 1. We have taken one element of the stack.
-                            self.current.gc_count -= 1;                           
+                            write!(self.output, "   sub {}, {}\n", native_reg(&lhs), native_reg(&rhs));
+                            write!(self.output, "   mov {}, {}\n", native_reg(&dst), native_reg(&lhs));
                         }
                         BinaryOp::Greater => {
-                           write!(self.output, "    mov rcx, 0\n"); 
-                           write!(self.output, "    mov rdx, 1\n");
-                           write!(self.output, "    pop rbx\n");
-                           write!(self.output, "    pop rax\n");
-                           write!(self.output, "    cmp rax, rbx\n");
-                           write!(self.output, "    cmovg rcx, rdx\n");
-                           write!(self.output, "    push rcx\n");
-
-                           // 2 - 1 = 1. We have taken one element of the stack.
-                           self.current.gc_count -= 1;
+                           write!(self.output, "    cmp {}, {}\n", native_reg(&lhs), native_reg(&rhs));
+                           write!(self.output, "    setg al\n");
+                           write!(self.output, "    movzx {}, al\n", native_reg(&dst));
                         }
                         BinaryOp::GreaterEquals => {
-                           write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
-                           write!(self.output, "    pop rbx\n"); // 1 > 0 in this case we have 1.
-                           write!(self.output, "    cmp rbx, rax\n");
+                           write!(self.output, "    cmp {}, {}\n", native_reg(&lhs), native_reg(&rhs));
                            write!(self.output, "    setge al\n");
-                           write!(self.output, "    movzx rax, al\n");
-                           write!(self.output, "    push rax\n");  
-                           // 2 - 1 = 1. We have taken one element of the stack.
-                           self.current.gc_count -= 1;
+                           write!(self.output, "    movzx {}, al\n", native_reg(&dst));
                         }
                         BinaryOp::Less => {
-                           write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
-                           write!(self.output, "    pop rbx\n"); // 1 > 0 in this case we have 1.
-                           write!(self.output, "    cmp rbx, rax\n");
+                           write!(self.output, "    cmp {}, {}\n", native_reg(&lhs), native_reg(&rhs));
                            write!(self.output, "    setl al\n");
-                           write!(self.output, "    movzx rax, al\n");
-                           write!(self.output, "    push rax\n");
-                           // 2 - 1 = 1. We have taken one element of the stack.
-                           self.current.gc_count -= 1;
+                           write!(self.output, "    movzx {}, al\n", native_reg(&dst));
                         }
                         BinaryOp::LessEquals => {
-                           write!(self.output, "    pop rax\n"); // 1 > 0 in this case we have 0. 
-                           write!(self.output, "    pop rbx\n"); // 1 > 0 in this case we have 1.
-                           write!(self.output, "    cmp rbx, rax\n");
+                           write!(self.output, "    cmp {}, {}\n", native_reg(&lhs), native_reg(&lhs));
                            write!(self.output, "    setle al\n");
-                           write!(self.output, "    movzx rax, al\n");
-                           write!(self.output, "    push rax\n");
-                           // 2 - 1 = 1. We have taken one element of the stack.
-                           self.current.gc_count -= 1;
+                           write!(self.output, "    movzx {}, al\n", native_reg(&dst));
 
                         }
                         o => todo!("Implement instrinsic: {:?}", o),
                     }
                 }
                 OpKind::NewVariable => {
-                    let offset = op.operands()[0].as_uint();
-                    let typ = op.operands()[1].as_type();
+                    let src = op.operands()[0].as_reg();
+                    let offset = op.operands()[1].as_uint();
+                    let typ = op.operands()[2].as_type();
                     write!(self.output, "    ; -- NewVariable -- \n");
-                    write!(self.output, "    pop rax\n");
-                    write!(self.output, "    mov [rbp-{:x}], rax\n", offset);
+                    write!(self.output, "    mov [rbp-{:x}], {}\n", offset, native_reg(&src));
 
                     if typ == Type::Reference {
-                        write!(self.output, "    mov {}, rax\n", self.convention.get(&0).unwrap());
+                        write!(self.output, "    mov {}, {}\n", self.convention.get(&0).unwrap(), native_reg(&src));
                         write!(self.output, "    call gpa_memory_ref_inc\n"); 
                     }
-
-                    // We have taken one value of the stack and moved it into a variable.
-                    self.current.gc_count -= 1;
                 }
                 OpKind::ResolveVariable => {
-                    let offset = op.operands()[0].as_uint();
+                    let dst = op.operands()[0].as_reg();
+                    let offset = op.operands()[1].as_uint();
                     write!(self.output, "    ; -- ResolveVariable --\n");
-                    write!(self.output, "    mov rax, [rbp-{:x}]\n", offset);
-                    write!(self.output, "    push rax\n");
-                    // We have resolved a value from a variables onto the stack.
-                    self.current.gc_count += 1;
+                    write!(self.output, "    mov {}, [rbp-{:x}]\n", native_reg(&dst), offset);
                 }
                 OpKind::NewString => {
-                    let data = op.operands()[0].as_data(); 
+                    let dst = op.operands()[0].as_reg();
+                    let data = op.operands()[1].as_data(); 
+
                     let scoped_name = self.current.append_data(data.clone());
 
                     write!(self.output, "    ; -- NewString --\n");
-                    write!(self.output, "    mov rax,{}\n", scoped_name);
-                    write!(self.output, "    push rax\n");
-
-                    self.current.gc_count += 1;
+                    write!(self.output, "    mov {},{}\n", native_reg(&dst), scoped_name);
                 }
                 OpKind::Call => {
                     let symbol = op.operands()[0].as_symbol();
-                    let arguments_size = op.operands()[1].as_uint();
+                    let args = op.operands()[1].as_regs();
+                    let dst = op.operands()[2].as_reg();
 
                     write!(self.output, "    ; -- Call --\n");
 
-                    for i in 0..arguments_size {
-                        let reg = self.convention.get(&i).unwrap();
+                    for arg in args.iter() {
+                        write!(self.output, "    push {}\n", native_reg(&arg));
+                    }
+
+                    let mut i = (args.len()) as u64;
+
+                    while i > 0 {
+                        let reg = self.convention.get(&(i - 1)).unwrap();
                         write!(self.output, "    pop {}\n", reg);
-                        self.current.gc_count -= 1;
+                        i -= 1; 
                     }
 
                     write!(self.output, "    xor eax, eax\n");
                     write!(self.output, "    call {}\n", symbol);
-
-                    if op.operands()[2].as_bool() {
-                        write!(self.output, "    push rax\n");
-                        self.current.gc_count += 1;
-                    }
+                    write!(self.output, "    mov {}, rax\n", native_reg(&dst));
                 }
                 OpKind::Jump => {
                     let symbol = op.operands()[0].as_symbol();
                     write!(self.output, "    ; -- Jump --\n");
-                    for i in 0..self.current.gc_count {
-                        write!(self.output, "    pop rax\n");
-                    }
                     write!(self.output, "    jmp {}\n", symbol);
                 }
                 OpKind::JumpUnless => {
-                    let symbol = op.operands()[0].as_symbol();
+                    let guard = op.operands()[0].as_reg();
+                    let symbol = op.operands()[1].as_symbol();
                     write!(self.output, "    ; -- JumpUnless --\n");
-                    write!(self.output, "    pop rax\n");
-                    write!(self.output, "    test rax, rax\n");
+                    write!(self.output, "    test {}, {}\n", native_reg(&guard), native_reg(&guard));
                     write!(self.output, "    jz {}\n", symbol);
-                    self.current.gc_count -= 1;
                 }
                 OpKind::Return => {
+                    let reg = op.operands()[0].as_reg();
+
                     write!(self.output, "    ; -- Return --\n");
-                    write!(self.output, "    pop rax\n");
+                    write!(self.output, "    mov rax, {}\n", native_reg(&reg));
+
                     write!(self.output, "    pop rbp\n");
                     write!(self.output, "    ret\n");
                 }
                 OpKind::SetField => {
                     write!(self.output, "    ; -- SetField --\n");
-                    let offset = op.operands()[0].as_uint();  
-                    let typ = op.operands()[1].as_type();
+                    let value = op.operands()[0].as_reg();
+                    let structure = op.operands()[1].as_reg();
+                    let offset = op.operands()[2].as_uint();  
+                    let typ = op.operands()[3].as_type();
 
-                    write!(self.output, "    pop rax\n");
-                    write!(self.output, "    pop r12\n");
-                    // write!(self.output, "    mov [r12 + {}], rax\n", offset);
-
-                    write!(self.output, "    mov {}, r12\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    mov {}, {}\n", self.convention.get(&0).unwrap(), native_reg(&structure));
                     write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), offset);
-                    write!(self.output, "    mov {}, rax\n", self.convention.get(&2).unwrap());
+                    write!(self.output, "    mov {}, {}\n", self.convention.get(&2).unwrap(), native_reg(&value));
                     write!(self.output, "    xor eax, eax\n");
 
                     match typ {
@@ -324,20 +309,15 @@ impl NasmBackend {
                             write!(self.output, "    call gpa_memory_set_ptr_field\n");
                         }
                     }
-
-                    write!(self.output, "    push r12\n");
-
-                    self.current.gc_count -= 1;
                 }
                 OpKind::ResolveField => {
                     write!(self.output, "    ; -- ResolveField --\n");
-                    let offset = op.operands()[0].as_uint();
-                    let typ = op.operands()[1].as_type();
+                    let structure = op.operands()[0].as_reg();
+                    let reg = op.operands()[1].as_reg();
+                    let offset = op.operands()[2].as_uint();
+                    let typ = op.operands()[3].as_type();
 
-                    write!(self.output, "    pop r12\n");
-                    // write!(self.output, "    mov rax, [r12 + {}]\n", offset);
-
-                    write!(self.output, "    mov {}, r12\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    mov {}, {}\n", self.convention.get(&0).unwrap(), native_reg(&structure));
                     write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), offset);
                     write!(self.output, "    xor eax, eax\n");
 
@@ -354,15 +334,15 @@ impl NasmBackend {
                         }
                     }
 
-                    write!(self.output, "    push rax\n");
+                    write!(self.output, "    mov {}, rax\n", native_reg(&reg));
                 }
                 OpKind::NewStruct => {
-                    let size = op.operands()[0].as_uint();
+                    let dst = op.operands()[0].as_reg();
+                    let size = op.operands()[1].as_uint();
                     write!(self.output, "    ; -- NewStruct --\n");
                     write!(self.output, "    mov rdi, {}\n", size);
                     write!(self.output, "    call gpa_allocate_counted\n");
-                    write!(self.output, "    push rax\n");
-                    self.current.gc_count += 1;
+                    write!(self.output, "    mov {}, rax\n", native_reg(&dst));
                 }
                 OpKind::Deref => {
                     let offset = op.operands()[0].as_uint();
@@ -377,23 +357,25 @@ impl NasmBackend {
                     write!(self.output, "    call gpa_memory_ref_dec\n");
                 }
                 OpKind::ArrayInit => {
-                    let elem_size = op.operands()[0].as_uint(); 
-                    let array_size = op.operands()[1].as_uint();
+                    let dst = op.operands()[0].as_reg();
+                    let elem_size = op.operands()[1].as_uint(); 
+                    let array_size = op.operands()[2].as_uint();
 
                     write!(self.output, "    ; -- ArrayInit --\n");
                     write!(self.output, "    mov {}, {elem_size}\n", self.convention.get(&0).unwrap());
                     write!(self.output, "    mov {}, {array_size}\n", self.convention.get(&1).unwrap());
                     write!(self.output, "    xor eax, eax\n");
                     write!(self.output, "    call runtime_allocate_array\n");
-                    write!(self.output, "    push rax\n");
-                    self.current.gc_count += 1;
+                    write!(self.output, "    mov {}, rax\n", native_reg(&dst));
                 }
                 OpKind::ArrayAppend => {
-                    let typ = op.operands()[0].as_type();
+                    let val = op.operands()[0].as_reg();
+                    let array = op.operands()[1].as_reg();
+                    let typ = op.operands()[2].as_type();
 
                     write!(self.output, "    ; -- ArrayAppend --\n");
-                    write!(self.output, "    pop {}\n", self.convention.get(&1).unwrap());
-                    write!(self.output, "    pop {}\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    mov {}, {}\n", self.convention.get(&1).unwrap(), native_reg(&array));
+                    write!(self.output, "    mov {}, {}\n", self.convention.get(&0).unwrap(), native_reg(&val));
                     write!(self.output, "    xor eax, eax\n");
 
                     match typ {
@@ -410,14 +392,17 @@ impl NasmBackend {
                     }
 
                     write!(self.output, "    push rax\n");;
-                    self.current.gc_count -= 1;
                 }
                 OpKind::ArrayIndex => {
-                    let index = op.operands()[0].as_uint();
-                    let typ = op.operands()[1].as_type();
+                    let array = op.operands()[0].as_reg();
+                    let dst = op.operands()[1].as_reg();
+                    let index = op.operands()[2].as_uint();
+                    let typ = op.operands()[3].as_type();
+
                     write!(self.output, "    ; -- ArrayIndex --\n"); 
-                    write!(self.output, "    pop {}\n", self.convention.get(&0).unwrap());
+                    write!(self.output, "    mov {}, {}\n", self.convention.get(&0).unwrap(), native_reg(&array));
                     write!(self.output, "    mov {}, {index}\n", self.convention.get(&1).unwrap());
+
                     match typ {
                         Type::Reference |
                         Type::Object => {
@@ -430,7 +415,8 @@ impl NasmBackend {
                             write!(self.output, "    call runtime_array_at_ptr\n");
                         }
                     }
-                    write!(self.output, "    push rax\n");
+
+                    write!(self.output, "    mov {}, rax\n", native_reg(&dst));
                 }
                 other => unimplemented!("Generating for: {:?} not implemented yet", other) 
             }

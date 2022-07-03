@@ -96,13 +96,20 @@ impl Compiler {
         let ops = self.generator.eject_ops();
         let externals = self.generator.eject_externals();
 
+        self.generator.dump_registers();
+
         let mut backend = NasmBackend::new(
             format!("{}.asm", self.output).to_string()
         );
 
+        for op in ops.iter() {
+            println!("Op: {:?}", op);
+        }
+
         backend.generate_header(externals);
 
         backend.generate_ops(ops);
+
         backend.finish();
     }
 
@@ -116,7 +123,7 @@ impl Compiler {
         let runtime_link = format!("{pwd}/bld/runtime/runtime.so");
         let object_file = format!("{}.o", self.output);
 
-        util::run_cmd_echoed(format!("nasm -felf64 {}.asm", self.output));
+        util::run_cmd_echoed(format!("nasm -felf64 -F dwarf -g {}.asm", self.output));
         util::run_cmd_echoed(format!("clang -no-pie -o {} {runtime_link} ./{object_file}", self.output));
     }
 }

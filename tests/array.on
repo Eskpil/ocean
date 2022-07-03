@@ -1,9 +1,5 @@
 extern fn println(message: String);
 
-struct Epic {
-    people: Array<String>
-}
-
 fn program() {
     let array = ["John", "Alice"];
 

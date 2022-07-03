@@ -95,7 +95,7 @@ impl Scope {
             Level::Error,
             Step::Checking,
             format!(
-                "Function: {} does not exist in current scope.", 
+                "Structure: {} does not exist in current scope.", 
                 name.clone()
             ),                    
         ))
@@ -103,11 +103,20 @@ impl Scope {
 
     pub fn find_struct_by_id(
         &self,
-        id: TypeId,
+        id: StructId,
     ) -> Result<CheckedStruct, OceanError> {
-        match self.structs.iter().find(|&x| x.type_id.unwrap() == id) {
-            Some(structure) => Ok(structure.clone()),
-            None => todo!("Error when looking up by type_id"),
+        match self.structs.get(id) {
+            Some(s) => Ok(s.clone()),
+            None => {
+            Err(OceanError::no_span(
+                Level::Error,
+                Step::Checking,
+                format!(
+                    "Structure: {} does not exist in current scope.", 
+                    id 
+                ),                    
+            ))               
+            }
         }
     }
 

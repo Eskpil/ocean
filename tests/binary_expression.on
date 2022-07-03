@@ -1,5 +1,5 @@
 fn program() {
     let a = 1 + 2 * 3;
-    let b = "Hello, World\n";
+    let b = 100;
     let c = a + b;
 }

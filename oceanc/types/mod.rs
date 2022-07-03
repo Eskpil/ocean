@@ -44,37 +44,37 @@ pub struct CheckedLookup {
     pub lhs: CheckedVariable,
     pub rhs: String,
 
-    pub type_id: TypeId,
+    pub typ: Type,
     pub offset: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct CheckedNamedArgument {
     pub name: String,
-    pub type_id: TypeId,
     pub offset: usize,
     pub expr: CheckedExpression,
 
+    pub typ: Type,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct CheckedNamedParameter {
     pub name: String,
-    pub type_id: TypeId,
+    pub typ: Type,
 }
 
 #[derive(Debug, Clone)]
 pub struct CheckedField {
     pub name: String,
-    pub type_id: TypeId,
+    pub typ: Type,
 }
 
 #[derive(Debug, Clone)]
 pub struct CheckedFunctionCall {
     pub name: String,
     pub arguments: Vec<CheckedNamedArgument>,
-    pub returning: TypeId,
+    pub returning: Type,
 }
 
 #[derive(Debug, Clone)]
@@ -82,14 +82,13 @@ pub struct CheckedStructInit {
     pub name: String, 
     pub size: usize,
     pub arguments: Vec<CheckedNamedArgument>,
-    pub returning: TypeId,
+    pub returning: Type,
 }
 
 #[derive(Debug, Clone)]
 pub struct CheckedArrayInit {
     pub arguments: Vec<CheckedExpression>,
-
-    pub contains: TypeId,
+    pub contains: Type,
 }
 
 #[derive(Debug, Clone)]
@@ -98,7 +97,7 @@ pub struct CheckedArrayIndex {
     pub index: u64,
 
     pub scope_id: ScopeId,
-    pub type_id: TypeId,
+    pub typ: Type,
 }
 
 #[derive(Debug, Clone)]
@@ -106,7 +105,6 @@ pub struct CheckedStruct {
     pub name: String,
     pub size: usize,
     pub fields: Vec<CheckedField>,
-    pub type_id: Option<TypeId>,
 }
 
 #[derive(Debug, Clone)]
@@ -146,13 +144,13 @@ pub struct CheckedFunction {
     pub external: bool,
     pub block: Option<CheckedBlock>,
     pub parameters: Vec<CheckedNamedParameter>,
-    pub returning: TypeId,
+    pub returning: Type,
 }
 
 #[derive(Debug, Clone)]
 pub struct CheckedVariable {
     pub name: String,    
-    pub type_id: TypeId,
+    pub typ: Type,
     pub scope_id: ScopeId,
 
     pub is_referenced: bool,
@@ -161,7 +159,7 @@ pub struct CheckedVariable {
 #[derive(Debug, Clone)]
 pub struct CheckedVariableDecl {
     pub name: String,    
-    pub type_id: TypeId,
+    pub typ: Type,
     pub scope_id: ScopeId,
     pub expr: CheckedExpression,
 }
@@ -228,7 +226,7 @@ impl CheckedFunctionCall {
     pub fn new(
         name: String, 
         arguments: Vec<CheckedNamedArgument>,
-        returning: TypeId,
+        returning: Type,
     ) -> Self {
         Self {
             name,
@@ -242,14 +240,14 @@ impl CheckedStructInit {
     pub fn new(
         name: String,
         arguments: Vec<CheckedNamedArgument>,
-        type_id: TypeId,
+        typ: Type,
         size: usize,
     ) -> Self {
         Self {
             name,
             size,
             arguments,
-            returning: type_id,
+            returning: typ,
         }
     }
 }
@@ -257,13 +255,13 @@ impl CheckedStructInit {
 impl CheckedNamedArgument {
     pub fn new(
         name: String, 
-        type_id: TypeId, 
+        typ: Type, 
         expr: CheckedExpression,
         span: Span,
     ) -> Self {
         Self {
             name,
-            type_id,
+            typ,
             expr,
             span,
             offset: 0,
@@ -272,10 +270,10 @@ impl CheckedNamedArgument {
 }
 
 impl CheckedNamedParameter {
-    pub fn new(name: String, type_id: TypeId) -> Self {
+    pub fn new(name: String, typ: Type) -> Self {
         Self {
             name,
-            type_id,
+            typ,
         }
     } 
 }
@@ -297,13 +295,13 @@ impl CheckedBinaryExpression {
 impl CheckedVariable {
     pub fn new(
         name: String, 
-        type_id: TypeId, 
+        typ: Type,
         scope_id: ScopeId,
         is_referenced: bool
     ) -> Self {
         Self {
             name,
-            type_id,
+            typ,
             scope_id,
             is_referenced,
         }
@@ -313,13 +311,13 @@ impl CheckedVariable {
 impl CheckedVariableDecl {
     pub fn new(
         name: String, 
-        type_id: TypeId, 
+        typ: Type, 
         scope_id: ScopeId,
         expr: CheckedExpression,
     ) -> Self {
         Self {
             name,
-            type_id,
+            typ,
             scope_id,
             expr,
         }
@@ -331,7 +329,7 @@ impl CheckedFunction {
         name: String, 
         parameters: Vec<CheckedNamedParameter>,
         block: Option<CheckedBlock>,
-        returning: TypeId,
+        returning: Type,
         external: bool,
     ) -> Self {
         Self {
@@ -349,7 +347,7 @@ impl CheckedReturn {
         expr: CheckedExpression,
     ) -> Self {
         Self {
-            expr
+            expr,
         }
     }
 }
@@ -364,10 +362,10 @@ impl CheckedBlock {
 }
 
 impl CheckedField {
-    pub fn new(name: String, id: TypeId) -> Self {
+    pub fn new(name: String, typ: Type) -> Self {
         Self {
             name,
-            type_id: id,
+            typ,
         } 
     }
 }
@@ -382,7 +380,6 @@ impl CheckedStruct {
             name,
             size,
             fields,
-            type_id: None,
         } 
     }
 }
@@ -391,13 +388,13 @@ impl CheckedLookup {
     pub fn new(
         lhs: CheckedVariable,
         rhs: String,
-        id: TypeId,
+        typ: Type,
         offset: usize,
     ) -> Self {
         Self {
             lhs, 
             rhs,
-            type_id: id,
+            typ,
             offset,
         }
     }
@@ -406,7 +403,7 @@ impl CheckedLookup {
 impl CheckedArrayInit {
     pub fn new(
         arguments: Vec<CheckedExpression>,
-        contains: TypeId,
+        contains: Type,
     ) -> Self {
         Self {
             arguments,
@@ -419,13 +416,13 @@ impl CheckedArrayIndex {
     pub fn new(
         ident: String,
         index: u64,
-        type_id: TypeId,
+        typ: Type,
         scope_id: ScopeId,
     ) -> Self {
         Self {
             ident,
             index,
-            type_id,
+            typ,
             scope_id,
         }
     }

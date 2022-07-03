@@ -5,16 +5,13 @@ use super::op::{
     Operand,
     Type
 };
+use super::register::Register;
 use super::generator::Generator;
 use crate::types::{
     TypeId,
     ScopeId,
 
-    VOID_TYPE_ID,
-    STRING_TYPE_ID,
-    PTR_TYPE_ID,
-    BOOL_TYPE_ID,
-    INT_TYPE_ID,
+    Type as ProjectType,
 
     CheckedStatement,
     CheckedBlock,
@@ -44,6 +41,10 @@ pub fn generate_block(
     block: &CheckedBlock,
     generator: &mut Generator,
 ) {
+    let block = &mut block.clone();
+
+    let ret = block.children.pop().unwrap();
+
     for stmt in block.children.iter() {
         generate_statement(project, stmt, generator);
     } 
@@ -52,20 +53,28 @@ pub fn generate_block(
 
     for variable in project.scope_variables(scope_id) {
 
-        if !variable.is_referenced && variable.type_id > PTR_TYPE_ID {
-            let mut offset = 0;
+        if !variable.is_referenced {
+            match variable.typ {
+                ProjectType::Struct(id) => {
+                    let mut offset = 0;
 
-            for scope_var in project.scope_variables(scope_id).iter() {
-                if scope_var.name == variable.name {
-                    break;
-                } else {
-                    offset += project.get_type_size(scope_var.type_id).unwrap() as u64; 
-                } 
+                    for scope_var in project.scope_variables(scope_id).iter() {
+                        if scope_var.name == variable.name {
+                            break;
+                        } else {
+                            let type_id = project.find_type_id(scope_var.typ.clone());
+                            offset += project.get_type_size(type_id).unwrap() as u64; 
+                        } 
+                    }
+
+                    generator.append(Op::single(OpKind::Deref, Operand::Uint(offset)));
+                }
+                _ => {}
             }
-
-            generator.append(Op::single(OpKind::Deref, Operand::Uint(offset)));
         }
     }
+
+    generate_statement(project, &ret, generator);
 }
 
 pub fn generate_statement(
@@ -82,8 +91,9 @@ pub fn generate_statement(
             generator.append(Op::single(OpKind::Block, Operand::Symbol(label)));
             generate_block(project, block, generator);
         }
-        CheckedStatement::Expression(expr) => 
-            generate_expression(project, expr, generator),
+        CheckedStatement::Expression(expr) => {
+            let _ = generate_expression(project, expr, generator);
+        }
         CheckedStatement::VariableDecl(var) =>
             generate_variable_decl(project, var, generator),
         CheckedStatement::If(stmt) =>
@@ -105,8 +115,11 @@ pub fn generate_while_statement(
     let expression_label = generator.allocate_label();                  
 
     generator.append(Op::single(OpKind::Block, Operand::Symbol(expression_label.clone())));
-    generate_expression(project, &stmt.cond, generator);
-    generator.append(Op::single(OpKind::JumpUnless, Operand::Symbol(end_label.clone())));
+
+    let reg = generate_expression(project, &stmt.cond, generator);
+    generator.release_reg(reg);
+
+    generator.append(Op::double(OpKind::JumpUnless, Operand::Reg(reg), Operand::Symbol(end_label.clone())));
 
     let body_label = generator.allocate_label();
     generator.append(Op::single(OpKind::Block, Operand::Symbol(body_label)));
@@ -123,8 +136,11 @@ pub fn generate_return_statement(
     stmt: &CheckedReturn,
     generator: &mut Generator,
 ) {
-    generate_expression(project, &stmt.expr, generator);  
-    generator.append(Op::none(OpKind::Return));
+    let reg = generate_expression(project, &stmt.expr, generator);  
+
+    generator.release_reg(reg);
+
+    generator.append(Op::single(OpKind::Return, Operand::Reg(reg)));
 }
 
 pub fn generate_if_statement(
@@ -134,14 +150,20 @@ pub fn generate_if_statement(
 ) {
     let end_label = generator.allocate_label();
     let true_block = generator.allocate_label();
-    generate_expression(project, &stmt.cond, generator);
+    let reg = generate_expression(project, &stmt.cond, generator);
 
     if let Some(block) = &stmt.else_block {
         let else_block = generator.allocate_label(); 
-        generator.append(Op::single(
+
+        generator.release_reg(reg);
+
+        generator.append(
+            Op::double(
                 OpKind::JumpUnless, 
+                Operand::Reg(reg),
                 Operand::Symbol(else_block.clone())
-        ));
+            )
+        );
 
         generator.append(Op::single(
                 OpKind::Block,
@@ -160,10 +182,14 @@ pub fn generate_if_statement(
         ));
         generate_block(project, &block, generator);
     } else {
-        generator.append(Op::single(
-            OpKind::JumpUnless,
-            Operand::Symbol(end_label.clone()),
-        ));
+        generator.release_reg(reg);
+        generator.append(
+            Op::double(
+                OpKind::JumpUnless,
+                Operand::Reg(reg),
+                Operand::Symbol(end_label.clone()),
+            )
+        );
         generator.append(Op::single(
             OpKind::Block,
             Operand::Symbol(true_block.clone()),
@@ -183,7 +209,7 @@ pub fn generate_variable_decl(
     var: &CheckedVariableDecl,
     generator: &mut Generator,
 ) {
-    generate_expression(project, &var.expr, generator);  
+    let reg = generate_expression(project, &var.expr, generator);  
     
     let scope_id = var.scope_id;
     let mut offset: u64 = 0;
@@ -197,29 +223,29 @@ pub fn generate_variable_decl(
                 is_reference = true;
             }
 
-            offset += project.get_type_size(scope_var.type_id).unwrap() as u64; 
+            let type_id = project.find_type_id(scope_var.typ.clone());
+            offset += project.get_type_size(type_id).unwrap() as u64; 
         } 
     }
 
     let mut typ = Type::Object;
 
-    if var.type_id == PTR_TYPE_ID || var.type_id == STRING_TYPE_ID {
-        typ = Type::Ptr;
-    } else if var.type_id == INT_TYPE_ID || var.type_id == BOOL_TYPE_ID {
+    if var.typ == ProjectType::Usize || var.typ == ProjectType::Bool {
         typ = Type::Num;
-    } else {
-        typ = Type::Object;
-    } 
+    }
 
     if is_reference {
         typ = Type::Reference; 
     }
 
-    let op = Op::double(
+    let op = Op::tripple(
         OpKind::NewVariable, 
+        Operand::Reg(reg),
         Operand::Uint(offset),
         Operand::Type(typ),
     );
+
+    generator.release_reg(reg);
 
     generator.append(op);
 }
@@ -228,6 +254,7 @@ pub fn generate_variable_lookup(
     project: &Project,
     name: String,
     scope_id: ScopeId,
+    reg: Register,
     generator: &mut Generator,
 ) {
     let var = project.find_variable(name.clone(), scope_id).unwrap();
@@ -239,12 +266,14 @@ pub fn generate_variable_lookup(
         if scope_var.name == var.name {
             break;
         } else {
-            offset += project.get_type_size(scope_var.type_id).unwrap() as u64;
+            let type_id = project.find_type_id(scope_var.typ.clone());
+            offset += project.get_type_size(type_id).unwrap() as u64;
         }
     }
 
-    let op = Op::single(
+    let op = Op::double(
         OpKind::ResolveVariable,
+        Operand::Reg(reg),
         Operand::Uint(offset),
     );
 
@@ -254,35 +283,49 @@ pub fn generate_variable_lookup(
 pub fn generate_binary_expression(
     project: &Project,
     expr: &CheckedBinaryExpression,
+    dst: Register,
     generator: &mut Generator,
 ) {
-    generate_expression(project, &*expr.lhs, generator);  
-    generate_expression(project, &*expr.rhs, generator);
-    let op = Op::single(OpKind::Intrinsic, Operand::Op(expr.op));
+    let lhs = generate_expression(project, &*expr.lhs, generator);  
+    let rhs = generate_expression(project, &*expr.rhs, generator);
+
+    let op = Op::quadrouple(
+        OpKind::Intrinsic, 
+        Operand::Op(expr.op), 
+        Operand::Reg(dst), 
+        Operand::Reg(lhs), 
+        Operand::Reg(rhs)
+    );
+
+    generator.release_reg(lhs);
+    generator.release_reg(rhs);
+
     generator.append(op);
 }
 
 pub fn generate_call_expression(
     project: &Project,
     call: &CheckedFunctionCall,
+    dst: Register,
     generator: &mut Generator,
 ) {
+    let mut arguments = Vec::<Register>::new();
+
     for arg in call.arguments.iter() {
-        generate_expression(project, &arg.expr, generator);
+        let reg = generate_expression(project, &arg.expr, generator);
+        arguments.push(reg);
     }  
-
-    let mut returning = true;
-
-    if call.returning == VOID_TYPE_ID {
-        returning = false;
-    }
 
     let op = Op::tripple(
         OpKind::Call,
         Operand::Symbol(call.name.clone()),
-        Operand::Uint(call.arguments.len() as u64),
-        Operand::Bool(returning),
+        Operand::Regs(arguments.clone()),
+        Operand::Reg(dst),
     );
+
+    for arg in arguments {
+        generator.release_reg(arg);
+    }
 
     generator.append(op);
 }
@@ -290,25 +333,37 @@ pub fn generate_call_expression(
 pub fn generate_struct_init(
     project: &Project, 
     init: &CheckedStructInit,
+    dst: Register,
     generator: &mut Generator,
 ) {
-    generator.append(Op::single(OpKind::NewStruct, Operand::Uint(init.size as u64)));
+    generator.append(
+        Op::double(
+            OpKind::NewStruct, 
+            Operand::Reg(dst), 
+            Operand::Uint(init.size as u64)
+        )
+    );
 
     for argument in init.arguments.iter() {
-        generate_expression(project, &argument.expr, generator);
-        let size = project.get_type_size(argument.type_id).unwrap();
+        let reg = generate_expression(project, &argument.expr, generator);
+        let type_id = project.find_type_id(argument.typ.clone());
+        let size = project.get_type_size(type_id).unwrap();
 
-        let mut typ = Type::Num;
+        let mut typ = Type::Object;
 
-        if argument.type_id == STRING_TYPE_ID {
-            typ = Type::Ptr;
+        if argument.typ == ProjectType::Usize || argument.typ == ProjectType::Bool {
+            typ = Type::Num;
         }
 
-        generator.append(Op::double(
+        generator.append(Op::quadrouple(
                 OpKind::SetField, 
+                Operand::Reg(reg),
+                Operand::Reg(dst),
                 Operand::Uint(argument.offset as u64),
                 Operand::Type(typ),
         ));
+
+        generator.release_reg(reg);
     }
 }
 
@@ -316,49 +371,58 @@ pub fn generate_expression(
     project: &Project,
     expr: &CheckedExpression,
     generator: &mut Generator,
-) {
+) -> Register {
+    let reg = generator.allocate_reg();
+
     match expr {
         CheckedExpression::Binary(expr) =>
-            generate_binary_expression(project, expr, generator),
+            generate_binary_expression(project, expr, reg, generator),
         CheckedExpression::Literal(v) => {
-            let op = Op::single(OpKind::Push, Operand::Uint(*v));
+            let op = Op::double(OpKind::Load, Operand::Reg(reg), Operand::Uint(*v));
             generator.append(op);
         }
         CheckedExpression::StringLiteral(v) => {
-            let op = Op::single(OpKind::NewString, Operand::Data(v.clone()));
+            let op = Op::double(OpKind::NewString, Operand::Reg(reg), Operand::Data(v.clone()));
             generator.append(op);
         }
         CheckedExpression::Bool(v) => {
-            let mut op = Op::single(OpKind::Push, Operand::Uint(0)); 
+            let mut op = Op::double(OpKind::Load, Operand::Reg(reg), Operand::Uint(0)); 
+
             if *v {
-                op = Op::single(OpKind::Push, Operand::Uint(1));
+                op = Op::double(OpKind::Load, Operand::Reg(reg), Operand::Uint(1));
             }
+
             generator.append(op);
         }
         CheckedExpression::Call(call) => 
-            generate_call_expression(project, call, generator),
+            generate_call_expression(project, call, reg, generator),
         CheckedExpression::StructInit(init) =>
-            generate_struct_init(project, init, generator),
+            generate_struct_init(project, init, reg, generator),
         CheckedExpression::Identifier(v, id) => 
             generate_variable_lookup(
                 project,
                 v.to_string(),
                 *id,
+                reg,
                 generator,
             ),
         CheckedExpression::Lookup(expr) =>
-            generate_lookup(project, expr, generator),
+            generate_lookup(project, expr, reg, generator),
         CheckedExpression::ArrayInit(expr) =>
-            generate_array_init(project, expr, generator),
+            generate_array_init(project, expr, reg, generator),
         CheckedExpression::ArrayIndex(expr) =>
-            generate_array_index(project, expr, generator),
+            generate_array_index(project, expr, reg, generator),
+        CheckedExpression::Empty => {}
         o => todo!("Implement expression: {:?}", o),
-    }
+    };
+
+    return reg;
 }
 
 pub fn generate_array_index(
     project: &Project,
     index: &CheckedArrayIndex,
+    dst: Register,
     generator: &mut Generator
 ) {
     let mut offset: u64 = 0;
@@ -367,33 +431,36 @@ pub fn generate_array_index(
         if scope_var.name == index.ident {
             break;
         } else {
-            offset += project.get_type_size(scope_var.type_id).unwrap() as u64; 
+            let type_id = project.find_type_id(scope_var.typ.clone());
+            offset += project.get_type_size(type_id).unwrap() as u64; 
         } 
     }
+
+    let array = generator.allocate_reg();
      
-    let op = Op::single(
+    let op = Op::double(
         OpKind::ResolveVariable,
+        Operand::Reg(array),
         Operand::Uint(offset),
     );
 
     let mut typ = Type::Object;
 
-    if index.type_id == PTR_TYPE_ID || index.type_id == STRING_TYPE_ID {
-        typ = Type::Ptr;
-    } else if index.type_id == INT_TYPE_ID || index.type_id == BOOL_TYPE_ID {
+    if index.typ == ProjectType::Usize || index.typ == ProjectType::Bool {
         typ = Type::Num;
-    } else {
-        typ = Type::Object;
     }
-
 
     generator.append(op);
 
-    let op = Op::double(
+    let op = Op::quadrouple(
         OpKind::ArrayIndex,
+        Operand::Reg(array),
+        Operand::Reg(dst),
         Operand::Uint(index.index),
         Operand::Type(typ),
     );
+
+    generator.release_reg(array);
 
     generator.append(op);
 }
@@ -401,13 +468,16 @@ pub fn generate_array_index(
 pub fn generate_array_init(
     project: &Project,
     array: &CheckedArrayInit,
+    reg: Register,
     generator: &mut Generator,
 ) {
     let array_size = array.arguments.len();   
-    let elem_size = project.get_type_size(array.contains).unwrap();
+    let type_id = project.find_type_id(array.contains.clone());
+    let elem_size = project.get_type_size(type_id).unwrap();
 
-    let op = Op::double(
+    let op = Op::tripple(
         OpKind::ArrayInit,
+        Operand::Reg(reg),
         Operand::Uint(elem_size as u64),
         Operand::Uint(array_size as u64),
     );
@@ -415,29 +485,30 @@ pub fn generate_array_init(
     generator.append(op);
 
     for arg in array.arguments.iter() {
-        generate_expression(project, arg, generator);
+        let val = generate_expression(project, arg, generator);
 
         let mut typ = Type::Object;
 
-        if array.contains == PTR_TYPE_ID || array.contains == STRING_TYPE_ID {
-            typ = Type::Ptr;
-        } else if array.contains == INT_TYPE_ID || array.contains == BOOL_TYPE_ID {
+        if array.contains == ProjectType::Usize || array.contains == ProjectType::Bool {
             typ = Type::Num;
-        } else {
-            typ = Type::Object;
         }
 
-        let op = Op::single(
+        let op = Op::tripple(
             OpKind::ArrayAppend,
+            Operand::Reg(val),
+            Operand::Reg(reg),
             Operand::Type(typ),
         );  
         generator.append(op);
+
+        generator.release_reg(val);
     }
 }
 
 pub fn generate_lookup(
     project: &Project,
     lookup: &CheckedLookup,
+    dst: Register,
     generator: &mut Generator,
 ) {
     let scope_id = lookup.lhs.scope_id;     
@@ -447,12 +518,16 @@ pub fn generate_lookup(
         if scope_var.name == lookup.lhs.name {
             break;
         } else {
-            offset += project.get_type_size(scope_var.type_id).unwrap() as u64;
+            let type_id = project.find_type_id(scope_var.typ.clone());
+            offset += project.get_type_size(type_id).unwrap() as u64;
         }
     }
 
-    let op = Op::single(
+    let structure = generator.allocate_reg();
+
+    let op = Op::double(
         OpKind::ResolveVariable,
+        Operand::Reg(structure),
         Operand::Uint(offset),
     );
 
@@ -460,19 +535,19 @@ pub fn generate_lookup(
 
     let mut typ = Type::Object;
 
-    if lookup.type_id == PTR_TYPE_ID || lookup.type_id == STRING_TYPE_ID {
-        typ = Type::Ptr;
-    } else if lookup.type_id == INT_TYPE_ID || lookup.type_id == BOOL_TYPE_ID {
-        typ = Type::Num;
-    } else {
-        typ = Type::Object;
+    if lookup.typ == ProjectType::Usize || lookup.typ == ProjectType::Bool {
+        Type::Num;
     }
 
-    let op = Op::double(
+    let op = Op::quadrouple(
         OpKind::ResolveField,
+        Operand::Reg(structure),
+        Operand::Reg(dst),
         Operand::Uint(lookup.offset as u64),
         Operand::Type(typ),
     );
+
+    generator.release_reg(structure);
 
     generator.append(op);
 }
@@ -492,25 +567,36 @@ pub fn generate_function(
         generator.append(op);
 
         let mut offset = 0;
+        let mut idx = 0;
 
         for param in function.parameters.iter() {
-            let op = Op::single(
-                OpKind::NewVariable,
+            let mut typ = Type::Object;
+
+            if param.typ == ProjectType::Usize || param.typ == ProjectType::Bool {
+                typ = Type::Num;
+            } 
+
+            let op = Op::tripple(
+                OpKind::NewParameter,
+                Operand::Uint(idx),
                 Operand::Uint(offset),
+                Operand::Type(typ),
             );
 
-            let size = project.get_type_size(param.type_id).unwrap() as u64;
+            let type_id = project.find_type_id(param.typ.clone());
+            let size = project.get_type_size(type_id).unwrap() as u64;
             offset += size;
 
             generator.append(op);
+
+            idx += 1;
         }
 
         generate_block(project, block, generator);
-
-        generator.append(Op::none(OpKind::End));
     } else {
         if function.external {
             generator.add_external(function.name.clone());
         }    
-    }
-}
+    }}
+
+
